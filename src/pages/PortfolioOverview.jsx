@@ -9,21 +9,27 @@ import {
   Info,
   ArrowUpRight,
   ArrowDownRight,
+  Calendar,
+  Filter,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAccount } from 'wagmi';
-import { useUserOverview, usePortfolioSummaries, usePortfolioTotals } from '../hooks/useOceanData';
+import { useUserOverview, usePortfolioSummaries, usePortfolioTotals, useDailyEarningHistory } from '../hooks/useOceanData';
 import oceanContractService from '../services/oceanContractService';
 import { PortfolioStatus } from "../types/contract";
 import NumberPopup from "../components/NumberPopup";
 import Tooltip from "../components/Tooltip";
 import CopyButton from "../components/CopyButton";
 import ProgressBar from "../components/ProgressBar";
+import DailyEarningHistory from "../components/DailyEarningHistory";
 
 export default function PortfolioOverview() {
   const { address, isConnected } = useAccount();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [activeTab, setActiveTab] = useState('overview');
+  const [selectedPortfolio, setSelectedPortfolio] = useState('all');
+  const { data: earningHistory, loading: historyLoading, refetch: refetchHistory } = useDailyEarningHistory(30);
 
   const { data: overview, loading: overviewLoading, refetch: refetchOverview } = useUserOverview();
   const { data: portfolios, loading: portfoliosLoading, refetch: refetchPortfolios } = usePortfolioSummaries();
@@ -51,6 +57,7 @@ export default function PortfolioOverview() {
         refetchOverview(),
         refetchPortfolios(),
         refetchTotals(),
+        refetchHistory(),
       ]);
       setLastUpdated(new Date());
     } catch (error) {
@@ -59,6 +66,10 @@ export default function PortfolioOverview() {
       setIsRefreshing(false);
     }
   };
+
+  const filteredHistory = selectedPortfolio === 'all'
+    ? earningHistory
+    : earningHistory.filter(entry => entry.portfolioId === selectedPortfolio);
 
   const getTimeAgo = (date) => {
     const seconds = Math.floor((new Date() - date) / 1000);
@@ -161,6 +172,32 @@ export default function PortfolioOverview() {
         </div>
       </div>
 
+      <div className="flex gap-2 border-b border-cyan-500/30">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === 'overview'
+              ? 'text-cyan-400 border-b-2 border-cyan-400'
+              : 'text-cyan-400/60 hover:text-cyan-400/80'
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`px-4 py-2 text-sm font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'history'
+              ? 'text-cyan-400 border-b-2 border-cyan-400'
+              : 'text-cyan-400/60 hover:text-cyan-400/80'
+          }`}
+        >
+          <Calendar size={16} />
+          Daily Earning History
+        </button>
+      </div>
+
+      {activeTab === 'overview' && (
+        <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 animate-fade-in-up">
         <div className="cyber-glass rounded-xl p-4 border border-cyan-500/30 hover:border-cyan-500/80 relative overflow-hidden group transition-all">
           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
@@ -610,6 +647,16 @@ export default function PortfolioOverview() {
             </p>
           </div>
         </div>
+      )}
+        </>
+      )}
+
+      {activeTab === 'history' && (
+        <DailyEarningHistory
+          earningHistory={earningHistory || []}
+          portfolios={portfolios || []}
+          loading={historyLoading}
+        />
       )}
     </div>
   );

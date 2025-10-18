@@ -362,3 +362,35 @@ export function useLast7DaysEarnings() {
 
   return { data, loading, error, refetch: fetchData };
 }
+
+export function useDailyEarningHistory(daysCount = 30) {
+  const { address } = useActiveAddress();
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchData = useCallback(async () => {
+    if (!address) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const history = await oceanContractService.getDailyEarningHistory(address, daysCount);
+      setData(history);
+    } catch (err) {
+      console.error('Error fetching daily earning history:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [address, daysCount]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, loading, error, refetch: fetchData };
+}
