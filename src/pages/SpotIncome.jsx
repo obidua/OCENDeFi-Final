@@ -6,10 +6,10 @@ import { useIncomeDistributorContract } from '../hooks/useContract';
 import { useEffect, useState } from 'react';
 
 const spotLevels = [
-  { level: 1, minInvestment: '$100', earning: '10%', minDirects: 0, description: 'Starter Level' },
-  { level: 2, minInvestment: '$500', earning: '10%', minDirects: 3, description: 'Bronze Level' },
-  { level: 3, minInvestment: '$1,000', earning: '10%', minDirects: 5, description: 'Silver Level' },
-  { level: 4, minInvestment: '$5,000', earning: '10%', minDirects: 10, description: 'Gold Level' },
+  { level: 1, minInvestment: '$100', earning: '5%', minDirects: 0, description: 'Starter Level' },
+  { level: 2, minInvestment: '$500', earning: '5%', minDirects: 3, description: 'Bronze Level' },
+  { level: 3, minInvestment: '$1,000', earning: '5%', minDirects: 5, description: 'Silver Level' },
+  { level: 4, minInvestment: '$5,000', earning: '5%', minDirects: 10, description: 'Gold Level' },
 ];
 
 export default function SpotIncome() {
@@ -89,10 +89,10 @@ export default function SpotIncome() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-neon-green relative inline-block">
-          Spot Income
+          Spot Income (Direct Income)
           <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-neon-green/20 blur-xl -z-10" />
         </h1>
-        <p className="text-cyan-300/90 mt-1">Earn 10% direct referral income on every investment</p>
+        <p className="text-cyan-300/90 mt-1">Earn 5% direct commission on portfolio creation and topups</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -104,8 +104,8 @@ export default function SpotIncome() {
               <Coins size={24} className="text-cyan-400" />
             </div>
             <div>
-              <p className="text-sm text-cyan-300 font-medium uppercase tracking-wide">Total Spot Earnings</p>
-              <p className="text-xs text-cyan-300/90">Direct referral income</p>
+              <p className="text-sm text-cyan-300 font-medium uppercase tracking-wide">Total Direct Earnings</p>
+              <p className="text-xs text-cyan-300/90">5% commission from directs</p>
             </div>
           </div>
           <p className="text-4xl font-bold mb-2 text-cyan-400 relative z-10">
@@ -137,7 +137,7 @@ export default function SpotIncome() {
             </div>
             <div>
               <p className="text-sm font-medium text-cyan-300">Current Level</p>
-              <p className="text-xs text-cyan-300/90">Spot income tier</p>
+              <p className="text-xs text-cyan-300/90">Direct income tier</p>
             </div>
           </div>
           <p className="text-3xl font-bold text-neon-orange">Level {currentLevel}</p>
@@ -150,12 +150,12 @@ export default function SpotIncome() {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-xl font-semibold text-neon-green uppercase tracking-wide">Spot Income Levels</h2>
+              <h2 className="text-xl font-semibold text-neon-green uppercase tracking-wide">Direct Income Levels</h2>
               <p className="text-sm text-cyan-300/90 mt-1">Unlock higher tiers by building your direct team</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-cyan-300/90">Spot Rate</p>
-              <p className="text-2xl font-bold text-neon-green">10%</p>
+              <p className="text-xs text-cyan-300/90">Commission Rate</p>
+              <p className="text-2xl font-bold text-neon-green">5%</p>
             </div>
           </div>
         </div>
@@ -263,22 +263,22 @@ export default function SpotIncome() {
             <div className="text-center py-8">
               <Users className="w-12 h-12 text-cyan-400/30 mx-auto mb-3" />
               <p className="text-cyan-300/70">No direct referrals yet</p>
-              <p className="text-xs text-cyan-300/50 mt-1">Start building your team to earn spot income</p>
+              <p className="text-xs text-cyan-300/50 mt-1">Start building your team to earn direct commission</p>
             </div>
           )}
         </div>
 
         <div className="cyber-glass rounded-2xl p-6 border border-cyan-500/30">
-          <h3 className="font-semibold text-cyan-300 mb-4">How Spot Income Works</h3>
+          <h3 className="font-semibold text-cyan-300 mb-4">How Direct Income Works</h3>
           <div className="space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <span className="text-xs font-bold text-cyan-300">1</span>
               </div>
               <div>
-                <p className="text-sm font-medium text-cyan-300">Direct Referral Bonus</p>
+                <p className="text-sm font-medium text-cyan-300">Portfolio Creation & Topup</p>
                 <p className="text-xs text-cyan-300/90">
-                  Earn 10% instant commission on every direct referral's first investment
+                  Earn 5% instant commission whenever your direct referral creates a new portfolio or tops up
                 </p>
               </div>
             </div>
@@ -289,7 +289,7 @@ export default function SpotIncome() {
               <div>
                 <p className="text-sm font-medium text-cyan-300">Level Progression</p>
                 <p className="text-xs text-cyan-300/90">
-                  Unlock higher spot levels by building a larger direct team
+                  Unlock higher levels by building a larger direct team
                 </p>
               </div>
             </div>
@@ -300,7 +300,7 @@ export default function SpotIncome() {
               <div>
                 <p className="text-sm font-medium text-cyan-300">Instant Credit</p>
                 <p className="text-xs text-cyan-300/90">
-                  Spot income is credited immediately to your account
+                  Direct income is credited immediately to your account
                 </p>
               </div>
             </div>
@@ -311,7 +311,7 @@ export default function SpotIncome() {
                 When your direct referral stakes $1,000 worth of RAMA:
               </p>
               <p className="text-xs text-neon-green font-bold mt-2">
-                Your spot income = $1,000 × 10% = $100 RAMA
+                Your direct income = $1,000 × 5% = $50 RAMA
               </p>
             </div>
 
@@ -344,7 +344,7 @@ export default function SpotIncome() {
           <div>
             <p className="text-sm font-medium text-cyan-300 mb-1">Blockchain Integrated</p>
             <p className="text-xs text-cyan-300/90">
-              This page displays real-time data from the Ocean DeFi smart contracts. Spot income represents your direct referral earnings, which is credited instantly when your direct referrals make investments. All data is fetched directly from the Ramestta blockchain.
+              This page displays real-time data from the Ocean DeFi smart contracts. Direct income (Spot Income) represents your 5% commission earnings from direct referrals when they create new portfolios or topup existing ones. All data is fetched directly from the Ramestta blockchain.
             </p>
           </div>
         </div>

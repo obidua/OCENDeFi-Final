@@ -1,24 +1,95 @@
-import { TrendingUp, Users, DollarSign, Award } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-
-const earningsData = [
-  { date: 'Oct 1', amount: 25 },
-  { date: 'Oct 5', amount: 45 },
-  { date: 'Oct 10', amount: 65 },
-  { date: 'Oct 15', amount: 82 },
-  { date: 'Oct 20', amount: 98 },
-  { date: 'Oct 25', amount: 125 },
-  { date: 'Oct 30', amount: 145 },
-];
-
-const teamGrowthData = [
-  { month: 'Jul', members: 2 },
-  { month: 'Aug', members: 5 },
-  { month: 'Sep', members: 12 },
-  { month: 'Oct', members: 18 },
-];
+import { TrendingUp, Users, DollarSign, Award, Wallet, AlertCircle, Target, BarChart3 } from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { useUserOverview } from '../hooks/useOceanData';
+import { useIncomeDistributorContract } from '../hooks/useContract';
+import { useEffect, useState } from 'react';
+import oceanContractService from '../services/oceanContractService';
 
 export default function Analytics() {
+  const { address, isConnected } = useAccount();
+  const { data: overview, loading: overviewLoading } = useUserOverview();
+  const incomeDistributor = useIncomeDistributorContract();
+  const [incomeBreakdown, setIncomeBreakdown] = useState({
+    direct: '0',
+    slab: '0',
+    total: '0',
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchIncomeData() {
+      if (!incomeDistributor || !address) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const [directIncome, differenceIncome] = await Promise.all([
+          incomeDistributor.methods.directIncome(address).call(),
+          incomeDistributor.methods.differenceIncome(address).call(),
+        ]);
+
+        const totalIncome = (BigInt(directIncome) + BigInt(differenceIncome)).toString();
+
+        setIncomeBreakdown({
+          direct: directIncome,
+          slab: differenceIncome,
+          total: totalIncome,
+        });
+      } catch (error) {
+        console.error('Error fetching income data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchIncomeData();
+  }, [incomeDistributor, address]);
+
+  if (!isConnected || !address) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Wallet className="w-16 h-16 text-cyan-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-cyan-300 mb-2">Connect Your Wallet</h2>
+          <p className="text-cyan-300/70">Please connect your wallet to view analytics</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (overviewLoading || loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-cyan-500/20 rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-cyan-500/10 rounded w-1/2"></div>
+        </div>
+        <div className="grid md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="cyber-glass rounded-xl p-6 border border-cyan-500/30 animate-pulse">
+              <div className="h-4 bg-cyan-500/20 rounded w-2/3 mb-3"></div>
+              <div className="h-8 bg-cyan-500/30 rounded w-1/2"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const totalStakedUSD = overview?.totalStakedUSD || '0';
+  const qualifiedVolumeUSD = overview?.qualifiedVolumeUSD || '0';
+  const directCount = overview?.directCount || 0;
+  const teamCount = overview?.teamCount || 0;
+  const slabIndex = overview?.slabIndex || 0;
+  const royaltyTier = overview?.royaltyTier || 0;
+
+  const totalEarned = oceanContractService.toUSD(incomeBreakdown.total);
+  const directEarned = oceanContractService.toUSD(incomeBreakdown.direct);
+  const slabEarned = oceanContractService.toUSD(incomeBreakdown.slab);
+  const stakedValue = oceanContractService.toUSD(totalStakedUSD);
+  const qualifiedVolume = oceanContractService.toUSD(qualifiedVolumeUSD);
+
   return (
     <div className="space-y-6">
       <div>
@@ -30,7 +101,7 @@ export default function Analytics() {
       </div>
 
       <div className="grid md:grid-cols-4 gap-4">
-        <div className="cyber-glass rounded-xl p-5 border border-cyan-500/30 hover:border-cyan-500/80 relative overflow-hidden transition-all">
+        <div className="cyber-glass rounded-xl p-5 border border-cyan-500/30 hover:border-cyan-500/50 relative overflow-hidden transition-all">
           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 cyber-glass border border-cyan-500/30 rounded-lg">
@@ -38,195 +109,196 @@ export default function Analytics() {
             </div>
             <p className="text-sm font-medium text-cyan-400 uppercase tracking-wide">Total Earned</p>
           </div>
-          <p className="text-2xl font-bold text-cyan-300">$2,250</p>
-          <p className="text-xs text-neon-green mt-1">↑ 12% this month</p>
+          <p className="text-2xl font-bold text-cyan-300">${totalEarned.toLocaleString()}</p>
+          <p className="text-xs text-neon-green mt-1">All time earnings</p>
         </div>
 
-        <div className="cyber-glass rounded-xl p-5 border border-cyan-500/30 hover:border-cyan-500/80 relative overflow-hidden transition-all">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+        <div className="cyber-glass rounded-xl p-5 border border-cyan-500/30 hover:border-cyan-500/50 relative overflow-hidden transition-all">
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-neon-green/50 to-transparent" />
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 cyber-glass border border-neon-green/30 rounded-lg">
               <TrendingUp className="text-neon-green" size={20} />
             </div>
-            <p className="text-sm font-medium text-cyan-400 uppercase tracking-wide">Avg Daily</p>
+            <p className="text-sm font-medium text-neon-green uppercase tracking-wide">Portfolio Value</p>
           </div>
-          <p className="text-2xl font-bold text-cyan-300">$28.50</p>
-          <p className="text-xs text-cyan-300/90 mt-1">0.38% rate</p>
+          <p className="text-2xl font-bold text-cyan-300">${stakedValue.toLocaleString()}</p>
+          <p className="text-xs text-cyan-300/70 mt-1">Total staked</p>
         </div>
 
-        <div className="cyber-glass rounded-xl p-5 border border-cyan-500/30 hover:border-cyan-500/80 relative overflow-hidden transition-all">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+        <div className="cyber-glass rounded-xl p-5 border border-cyan-500/30 hover:border-cyan-500/50 relative overflow-hidden transition-all">
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-neon-orange/50 to-transparent" />
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 cyber-glass border border-neon-orange/30 rounded-lg">
               <Users className="text-neon-orange" size={20} />
             </div>
-            <p className="text-sm font-medium text-cyan-400 uppercase tracking-wide">Team Size</p>
+            <p className="text-sm font-medium text-neon-orange uppercase tracking-wide">Team Size</p>
           </div>
-          <p className="text-2xl font-bold text-cyan-300">18</p>
-          <p className="text-xs text-neon-green mt-1">↑ 6 this month</p>
+          <p className="text-2xl font-bold text-cyan-300">{teamCount.toString()}</p>
+          <p className="text-xs text-cyan-300/70 mt-1">{directCount.toString()} direct members</p>
         </div>
 
-        <div className="cyber-glass rounded-xl p-5 border border-cyan-500/30 hover:border-cyan-500/80 relative overflow-hidden transition-all">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+        <div className="cyber-glass rounded-xl p-5 border border-cyan-500/30 hover:border-cyan-500/50 relative overflow-hidden transition-all">
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 cyber-glass border border-neon-purple/30 rounded-lg">
-              <Award className="text-neon-purple" size={20} />
+            <div className="p-2 cyber-glass border border-cyan-400/30 rounded-lg">
+              <Award className="text-cyan-400" size={20} />
             </div>
-            <p className="text-sm font-medium text-cyan-400 uppercase tracking-wide">Total Rewards</p>
+            <p className="text-sm font-medium text-cyan-400 uppercase tracking-wide">Slab Level</p>
           </div>
-          <p className="text-2xl font-bold text-cyan-300">$850</p>
-          <p className="text-xs text-cyan-300/90 mt-1">Passive income</p>
+          <p className="text-2xl font-bold text-cyan-300">{slabIndex.toString()}</p>
+          <p className="text-xs text-cyan-300/70 mt-1">Current tier</p>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <div className="cyber-glass rounded-2xl p-6 border border-cyan-500/30 hover:border-cyan-500/80 relative overflow-hidden transition-all">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-          <h2 className="text-lg font-semibold text-cyan-300 mb-4 uppercase tracking-wide">Earnings Trend</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={earningsData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,240,255,0.1)" />
-              <XAxis dataKey="date" stroke="#22d3ee" fontSize={12} />
-              <YAxis stroke="#22d3ee" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                  border: '1px solid rgba(0,240,255,0.3)',
-                  borderRadius: '8px',
-                  color: '#22d3ee',
-                  backdropFilter: 'blur(10px)',
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="amount"
-                stroke="url(#colorGradient)"
-                strokeWidth={3}
-                dot={{ fill: '#00f0ff', r: 4, strokeWidth: 2, stroke: '#39ff14' }}
-              />
-              <defs>
-                <linearGradient id="colorGradient" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#00f0ff" />
-                  <stop offset="100%" stopColor="#39ff14" />
-                </linearGradient>
-              </defs>
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="cyber-glass rounded-2xl p-6 border border-cyan-500/30">
+          <h2 className="text-lg font-semibold text-cyan-300 mb-6 flex items-center gap-2">
+            <BarChart3 size={20} />
+            Income Breakdown
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-cyan-300">Direct Income</span>
+                <span className="text-sm font-bold text-neon-green">${directEarned.toLocaleString()}</span>
+              </div>
+              <div className="h-3 bg-dark-950 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-neon-green to-cyan-500"
+                  style={{
+                    width: `${totalEarned > 0 ? (directEarned / totalEarned) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-cyan-300">Slab Income</span>
+                <span className="text-sm font-bold text-neon-purple">${slabEarned.toLocaleString()}</span>
+              </div>
+              <div className="h-3 bg-dark-950 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-neon-purple to-cyan-500"
+                  style={{
+                    width: `${totalEarned > 0 ? (slabEarned / totalEarned) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-cyan-500/20">
+              <div className="flex justify-between">
+                <span className="text-sm font-medium text-cyan-300">Total Income</span>
+                <span className="text-lg font-bold text-cyan-300">${totalEarned.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="cyber-glass rounded-2xl p-6 border border-cyan-500/30 hover:border-cyan-500/80 relative overflow-hidden transition-all">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-          <h2 className="text-lg font-semibold text-cyan-300 mb-4 uppercase tracking-wide">Team Growth</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={teamGrowthData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,240,255,0.1)" />
-              <XAxis dataKey="month" stroke="#22d3ee" fontSize={12} />
-              <YAxis stroke="#22d3ee" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                  border: '1px solid rgba(0,240,255,0.3)',
-                  borderRadius: '8px',
-                  color: '#22d3ee',
-                  backdropFilter: 'blur(10px)',
-                }}
-              />
-              <Bar dataKey="members" fill="url(#barGradient)" radius={[8, 8, 0, 0]} />
-              <defs>
-                <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#00f0ff" />
-                  <stop offset="100%" stopColor="#39ff14" />
-                </linearGradient>
-              </defs>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="cyber-glass rounded-2xl p-6 border border-cyan-500/30">
+          <h2 className="text-lg font-semibold text-cyan-300 mb-6 flex items-center gap-2">
+            <Target size={20} />
+            Team Performance
+          </h2>
+          <div className="space-y-4">
+            <div className="cyber-glass border border-cyan-500/20 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-cyan-300/90">Qualified Volume</span>
+                <span className="text-lg font-bold text-neon-green">${qualifiedVolume.toLocaleString()}</span>
+              </div>
+              <p className="text-xs text-cyan-300/70">40:30:30 calculation</p>
+            </div>
+
+            <div className="cyber-glass border border-cyan-500/20 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-cyan-300/90">Direct Members</span>
+                <span className="text-lg font-bold text-cyan-400">{directCount.toString()}</span>
+              </div>
+              <p className="text-xs text-cyan-300/70">First-level referrals</p>
+            </div>
+
+            <div className="cyber-glass border border-cyan-500/20 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-cyan-300/90">Total Team</span>
+                <span className="text-lg font-bold text-neon-orange">{teamCount.toString()}</span>
+              </div>
+              <p className="text-xs text-cyan-300/70">All downline members</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="cyber-glass rounded-xl p-6 border border-cyan-500/30 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-          <h3 className="font-semibold text-cyan-300 mb-4 uppercase tracking-wide">Income Breakdown</h3>
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm text-cyan-300/90">Portfolio Growth</span>
-                <span className="text-sm font-bold text-cyan-300">$1,400</span>
+      <div className="cyber-glass rounded-2xl p-6 border border-cyan-500/30">
+        <h2 className="text-lg font-semibold text-cyan-300 mb-6">Achievement Status</h2>
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="cyber-glass border border-cyan-500/20 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${parseInt(slabIndex) > 0 ? 'bg-neon-green/20' : 'bg-cyan-500/20'}`}>
+                {parseInt(slabIndex) > 0 ? (
+                  <Award className="text-neon-green" size={20} />
+                ) : (
+                  <Award className="text-cyan-400" size={20} />
+                )}
               </div>
-              <div className="h-2 bg-dark-900 rounded-full overflow-hidden border border-cyan-500/30">
-                <div className="h-full bg-gradient-to-r from-cyan-500 to-neon-green rounded-full" style={{ width: '62%' }} />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm text-cyan-300/90">Slab Income</span>
-                <span className="text-sm font-bold text-neon-green">$450</span>
-              </div>
-              <div className="h-2 bg-dark-900 rounded-full overflow-hidden border border-cyan-500/30">
-                <div className="h-full bg-neon-green rounded-full" style={{ width: '20%' }} />
+              <div>
+                <p className="text-sm font-medium text-cyan-300">Slab Qualification</p>
+                <p className="text-xs text-cyan-300/70">Income tier</p>
               </div>
             </div>
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm text-cyan-300/90">Royalties</span>
-                <span className="text-sm font-bold text-neon-orange">$240</span>
+            <p className={`text-lg font-bold ${parseInt(slabIndex) > 0 ? 'text-neon-green' : 'text-cyan-400'}`}>
+              {parseInt(slabIndex) > 0 ? `Level ${slabIndex}` : 'Not Qualified'}
+            </p>
+          </div>
+
+          <div className="cyber-glass border border-cyan-500/20 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${parseInt(royaltyTier) > 0 ? 'bg-neon-orange/20' : 'bg-cyan-500/20'}`}>
+                {parseInt(royaltyTier) > 0 ? (
+                  <Award className="text-neon-orange" size={20} />
+                ) : (
+                  <Award className="text-cyan-400" size={20} />
+                )}
               </div>
-              <div className="h-2 bg-dark-900 rounded-full overflow-hidden border border-cyan-500/30">
-                <div className="h-full bg-neon-orange rounded-full shadow-neon-orange" style={{ width: '11%' }} />
+              <div>
+                <p className="text-sm font-medium text-cyan-300">Royalty Program</p>
+                <p className="text-xs text-cyan-300/70">Monthly rewards</p>
               </div>
             </div>
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm text-cyan-300/90">Rewards</span>
-                <span className="text-sm font-bold text-neon-purple">$160</span>
+            <p className={`text-lg font-bold ${parseInt(royaltyTier) > 0 ? 'text-neon-orange' : 'text-cyan-400'}`}>
+              {parseInt(royaltyTier) > 0 ? `Tier ${royaltyTier}` : 'Not Qualified'}
+            </p>
+          </div>
+
+          <div className="cyber-glass border border-cyan-500/20 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${parseInt(directCount) >= 3 ? 'bg-neon-green/20' : 'bg-cyan-500/20'}`}>
+                {parseInt(directCount) >= 3 ? (
+                  <Users className="text-neon-green" size={20} />
+                ) : (
+                  <Users className="text-cyan-400" size={20} />
+                )}
               </div>
-              <div className="h-2 bg-dark-900 rounded-full overflow-hidden border border-cyan-500/30">
-                <div className="h-full bg-neon-purple rounded-full shadow-neon-purple" style={{ width: '7%' }} />
+              <div>
+                <p className="text-sm font-medium text-cyan-300">Team Building</p>
+                <p className="text-xs text-cyan-300/70">Growth milestone</p>
               </div>
             </div>
+            <p className={`text-lg font-bold ${parseInt(directCount) >= 3 ? 'text-neon-green' : 'text-cyan-400'}`}>
+              {parseInt(directCount) >= 3 ? 'Active Builder' : 'Growing'}
+            </p>
           </div>
         </div>
+      </div>
 
-        <div className="cyber-glass rounded-xl p-6 border border-cyan-500/30 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-          <h3 className="font-semibold text-cyan-300 mb-4 uppercase tracking-wide">Performance Stats</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-cyan-300/90">Portfolio Progress</span>
-              <span className="text-lg font-bold text-neon-green">30%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-cyan-300/90">Days Active</span>
-              <span className="text-lg font-bold text-cyan-300">79</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-cyan-300/90">Avg Team Depth</span>
-              <span className="text-lg font-bold text-neon-orange">3.2</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-cyan-300/90">Claims Made</span>
-              <span className="text-lg font-bold text-neon-purple">12</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="cyber-glass border border-neon-green/50 rounded-xl p-6 text-white relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-neon-green/10 to-cyan-500/10 opacity-50 group-hover:opacity-70 transition-opacity" />
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-neon-green/70 to-transparent" />
-          <h3 className="font-semibold mb-4 relative z-10 uppercase tracking-wide">Projected Earnings</h3>
-          <div className="space-y-3 relative z-10">
-            <div>
-              <p className="text-sm opacity-90 mb-1">Next 30 Days</p>
-              <p className="text-2xl font-bold">$855</p>
-            </div>
-            <div>
-              <p className="text-sm opacity-90 mb-1">Next 90 Days</p>
-              <p className="text-2xl font-bold">$2,565</p>
-            </div>
-            <div className="pt-3 border-t border-white/20">
-              <p className="text-xs opacity-75 mb-1">Based on current rate</p>
-              <p className="text-sm">0.38% daily average</p>
-            </div>
+      <div className="cyber-glass border border-cyan-500/20 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="text-cyan-400 flex-shrink-0 mt-0.5" size={20} />
+          <div>
+            <p className="text-sm font-medium text-cyan-300 mb-1">Live Blockchain Analytics</p>
+            <p className="text-xs text-cyan-300/90">
+              All analytics data is fetched in real-time from the Ocean DeFi smart contracts on the Ramestta blockchain. Your performance metrics, income breakdown, and team statistics are calculated directly from on-chain data for complete transparency.
+            </p>
           </div>
         </div>
       </div>
