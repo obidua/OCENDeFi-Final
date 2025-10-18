@@ -1,29 +1,98 @@
-import { Gift, CheckCircle, Lock } from 'lucide-react';
-import { ONE_TIME_REWARDS, formatUSD, getMockUserStatus } from '../utils/contractData';
+import { Gift, CheckCircle, Lock, Wallet, AlertCircle } from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { useUserOverview } from '../hooks/useOceanData';
+import oceanContractService from '../services/oceanContractService';
 
-// Ocean-themed one-time reward names with symbolic meanings
 const REWARD_NAMES = [
-  'Coral Spark',        // 1 - $6,000 - First coral forms – the starting treasure
-  'Pearl Bloom',        // 2 - $15,000 - Discovery of the first pearl
-  'Shell Harvest',      // 3 - $40,000 - Collecting valuable shells
-  'Wave Bounty',        // 4 - $120,000 - Riding steady profit waves
-  'Tide Treasure',      // 5 - $300,000 - Strong current brings rewards
-  'Blue Depth Bonus',   // 6 - $600,000 - Diving into deeper value
-  'Guardian\'s Gift',   // 7 - $1.5M - Acknowledgement of leadership
-  'Captain\'s Chest',   // 8 - $3M - Commanding a thriving fleet
-  'Trident Gem',        // 9 - $6M - Mastery of the currents
-  'Sea Legend Award',   // 10 - $15M - Legendary impact
-  'Abyss Crown',        // 11 - $30M - Dominion of the deep
-  'Poseidon\'s Favor',  // 12 - $60M - Blessed by the ocean god
-  'Neptune Scepter',    // 13 - $200M - Rule over vast seas
-  'Ocean Infinity',     // 14 - $500M - Ultimate endless horizon
+  'Coral Spark',
+  'Pearl Bloom',
+  'Shell Harvest',
+  'Wave Bounty',
+  'Tide Treasure',
+  'Blue Depth Bonus',
+  'Guardian\'s Gift',
+  'Captain\'s Chest',
+  'Trident Gem',
+  'Sea Legend Award',
+  'Abyss Crown',
+  'Poseidon\'s Favor',
+  'Neptune Scepter',
+  'Ocean Infinity',
+];
+
+const ONE_TIME_REWARDS = [
+  { requiredVolumeUSD: 6000e8, rewardUSD: 100e8 },
+  { requiredVolumeUSD: 15000e8, rewardUSD: 100e8 },
+  { requiredVolumeUSD: 40000e8, rewardUSD: 100e8 },
+  { requiredVolumeUSD: 120000e8, rewardUSD: 250e8 },
+  { requiredVolumeUSD: 300000e8, rewardUSD: 250e8 },
+  { requiredVolumeUSD: 600000e8, rewardUSD: 250e8 },
+  { requiredVolumeUSD: 1500000e8, rewardUSD: 500e8 },
+  { requiredVolumeUSD: 3000000e8, rewardUSD: 500e8 },
+  { requiredVolumeUSD: 6000000e8, rewardUSD: 500e8 },
+  { requiredVolumeUSD: 15000000e8, rewardUSD: 1000e8 },
+  { requiredVolumeUSD: 30000000e8, rewardUSD: 1000e8 },
+  { requiredVolumeUSD: 60000000e8, rewardUSD: 1000e8 },
+  { requiredVolumeUSD: 200000000e8, rewardUSD: 1000e8 },
+  { requiredVolumeUSD: 500000000e8, rewardUSD: 1000e8 },
 ];
 
 export default function OneTimeRewards() {
-  const userStatus = getMockUserStatus();
-  const qualifiedVolume = parseFloat(userStatus.qualifiedVolumeUSD);
+  const { address, isConnected } = useAccount();
+  const { data: overview, loading: overviewLoading } = useUserOverview();
 
-  const claimedRewards = [0, 1, 2];
+  if (!isConnected || !address) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Wallet className="w-16 h-16 text-cyan-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-cyan-300 mb-2">Connect Your Wallet</h2>
+          <p className="text-cyan-300/70">Please connect your wallet to view one-time rewards</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (overviewLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-cyan-500/20 rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-cyan-500/10 rounded w-1/2"></div>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="cyber-glass rounded-xl p-6 border border-cyan-500/30 animate-pulse">
+              <div className="h-4 bg-cyan-500/20 rounded w-2/3 mb-3"></div>
+              <div className="h-8 bg-cyan-500/30 rounded w-1/2"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const qualifiedVolumeUSD = overview?.qualifiedVolumeUSD || '0';
+  const qualifiedVolume = oceanContractService.toUSD(qualifiedVolumeUSD);
+
+  const claimedRewards = [];
+  let totalEarned = 0;
+  let nextRewardIdx = -1;
+
+  ONE_TIME_REWARDS.forEach((reward, idx) => {
+    const requiredVolume = oceanContractService.toUSD(reward.requiredVolumeUSD.toString());
+    if (qualifiedVolume >= requiredVolume) {
+      claimedRewards.push(idx);
+      totalEarned += oceanContractService.toUSD(reward.rewardUSD.toString());
+    } else if (nextRewardIdx === -1) {
+      nextRewardIdx = idx;
+    }
+  });
+
+  const totalPossibleRewards = ONE_TIME_REWARDS.reduce((sum, r) =>
+    sum + oceanContractService.toUSD(r.rewardUSD.toString()), 0
+  );
+  const remainingPotential = totalPossibleRewards - totalEarned;
 
   return (
     <div className="space-y-6">
@@ -40,16 +109,16 @@ export default function OneTimeRewards() {
           <div className="absolute inset-0 bg-gradient-to-br from-neon-green/10 to-cyan-500/10 opacity-50 group-hover:opacity-70 transition-opacity" />
           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-neon-green/70 to-transparent" />
           <div className="flex items-center gap-3 mb-4 relative z-10">
-            <div className="p-2 cyber-glass border border-neon-green/30 rounded-lg backdrop-blur-sm">
-              <Gift size={24} />
+            <div className="p-2 bg-neon-green/20 rounded-lg backdrop-blur-sm border border-neon-green/30">
+              <Gift size={24} className="text-neon-green" />
             </div>
             <div>
-              <p className="text-sm font-medium uppercase tracking-wide">Rewards Claimed</p>
-              <p className="text-xs opacity-75">Out of 14 milestones</p>
+              <p className="text-sm text-neon-green font-medium uppercase tracking-wide">Rewards Claimed</p>
+              <p className="text-xs text-cyan-300/90">Out of 14 milestones</p>
             </div>
           </div>
-          <p className="text-5xl font-bold mb-2 relative z-10">{claimedRewards.length}</p>
-          <p className="text-sm opacity-90 relative z-10">/ 14 Total</p>
+          <p className="text-5xl font-bold mb-2 relative z-10 text-neon-green">{claimedRewards.length}</p>
+          <p className="text-sm text-cyan-300 relative z-10">/ 14 Total</p>
         </div>
 
         <div className="cyber-glass rounded-xl p-6 border border-cyan-500/30 relative overflow-hidden">
@@ -63,21 +132,21 @@ export default function OneTimeRewards() {
               <p className="text-xs text-cyan-300/90">From claimed rewards</p>
             </div>
           </div>
-          <p className="text-3xl font-bold text-neon-green">{formatUSD(8500000000000n)}</p>
+          <p className="text-3xl font-bold text-neon-green">${totalEarned.toLocaleString()}</p>
         </div>
 
         <div className="cyber-glass rounded-xl p-6 border border-cyan-500/30 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 cyber-glass border border-neon-purple/30 rounded-lg">
-              <Lock className="text-neon-purple" size={24} />
+            <div className="p-2 cyber-glass border border-neon-orange/30 rounded-lg">
+              <Lock className="text-neon-orange" size={24} />
             </div>
             <div>
               <p className="text-sm font-medium text-cyan-400 uppercase tracking-wide">Remaining Potential</p>
               <p className="text-xs text-cyan-300/90">Unclaimed rewards</p>
             </div>
           </div>
-          <p className="text-3xl font-bold text-neon-purple">{formatUSD(234350000n)}</p>
+          <p className="text-3xl font-bold text-neon-orange">${remainingPotential.toLocaleString()}</p>
         </div>
       </div>
 
@@ -87,26 +156,30 @@ export default function OneTimeRewards() {
 
         <div className="space-y-4">
           {ONE_TIME_REWARDS.map((reward, idx) => {
-            const requiredVolume = parseFloat(reward.requiredVolumeUSD);
+            const requiredVolume = oceanContractService.toUSD(reward.requiredVolumeUSD.toString());
+            const rewardAmount = oceanContractService.toUSD(reward.rewardUSD.toString());
             const isClaimed = claimedRewards.includes(idx);
             const isLocked = qualifiedVolume < requiredVolume;
+            const isNext = idx === nextRewardIdx;
 
             return (
               <div
                 key={idx}
                 className={`p-5 rounded-xl border-2 transition-all relative overflow-hidden group ${
                   isClaimed
-                    ? 'cyber-glass border-neon-green hover:border-neon-green/80'
+                    ? 'cyber-glass border-neon-green'
+                    : isNext
+                    ? 'cyber-glass border-cyan-500 shadow-cyan-500'
                     : isLocked
                     ? 'cyber-glass border-cyan-500/30 opacity-60'
-                    : 'cyber-glass border-cyan-500 hover:border-cyan-600'
+                    : 'cyber-glass border-cyan-500/50'
                 }`}
               >
                 {isClaimed && (
                   <div className="absolute inset-0 bg-gradient-to-r from-neon-green/5 to-cyan-500/5" />
                 )}
-                {!isClaimed && !isLocked && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-neon-green/5" />
+                {isNext && !isClaimed && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-neon-green/10 animate-pulse" />
                 )}
                 <div className="flex items-center justify-between gap-4 relative z-10">
                   <div className="flex-1">
@@ -114,37 +187,44 @@ export default function OneTimeRewards() {
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
                         isClaimed
                           ? 'bg-gradient-to-br from-neon-green to-cyan-500 text-dark-950'
+                          : isNext
+                          ? 'bg-gradient-to-br from-cyan-500 to-neon-green text-dark-950 animate-pulse'
                           : isLocked
                           ? 'cyber-glass border border-cyan-500/30 text-cyan-400/50'
-                          : 'bg-gradient-to-br from-cyan-500 to-neon-green text-dark-950'
+                          : 'cyber-glass border border-cyan-500/50 text-cyan-400'
                       }`}>
                         {idx + 1}
                       </div>
                       <div>
                         <p className={`font-semibold ${
-                          isClaimed ? 'text-neon-green' : isLocked ? 'text-cyan-400/50' : 'text-cyan-300'
+                          isClaimed ? 'text-neon-green' : isNext ? 'text-cyan-300' : isLocked ? 'text-cyan-400/50' : 'text-cyan-400'
                         }`}>
                           {REWARD_NAMES[idx]}
                         </p>
                         <p className="text-xs text-cyan-300/60">Reward #{idx + 1}</p>
                         <p className="text-sm text-cyan-300/90">
-                          Required Volume: {formatUSD(reward.requiredVolumeUSD)}
+                          Required Volume: ${requiredVolume.toLocaleString()}
                         </p>
+                        {isNext && (
+                          <p className="text-xs text-cyan-300 mt-1">
+                            ${(requiredVolume - qualifiedVolume).toLocaleString()} more needed
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   <div className="text-right">
                     <p className={`text-2xl font-bold mb-1 ${
-                      isClaimed ? 'text-neon-green' : isLocked ? 'text-cyan-400/50' : 'text-cyan-300'
+                      isClaimed ? 'text-neon-green' : isNext ? 'text-cyan-300' : isLocked ? 'text-cyan-400/50' : 'text-cyan-400'
                     }`}>
-                      {formatUSD(reward.rewardUSD)}
+                      ${rewardAmount.toLocaleString()}
                     </p>
                     <div>
                       {isClaimed ? (
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-neon-green/20 text-neon-green rounded-full text-xs font-medium border border-neon-green/30">
                           <CheckCircle size={14} />
-                          Claimed
+                          Earned
                         </span>
                       ) : isLocked ? (
                         <span className="inline-flex items-center gap-1 px-3 py-1 cyber-glass border border-cyan-500/20 text-cyan-400/50 rounded-full text-xs font-medium">
@@ -152,9 +232,9 @@ export default function OneTimeRewards() {
                           Locked
                         </span>
                       ) : (
-                        <button className="px-3 py-1 bg-gradient-to-r from-cyan-500 to-neon-green text-dark-950 rounded-full text-xs font-bold hover:shadow-neon-cyan transition-all">
-                          Claim Now
-                        </button>
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-full text-xs font-medium border border-cyan-500/30">
+                          Available
+                        </span>
                       )}
                     </div>
                   </div>
@@ -185,7 +265,7 @@ export default function OneTimeRewards() {
               </div>
               <div>
                 <p className="text-sm font-medium text-cyan-300">Reach Milestones</p>
-                <p className="text-xs text-cyan-300/90">Unlock rewards at $6,000 intervals</p>
+                <p className="text-xs text-cyan-300/90">Unlock rewards starting at $6,000 volume</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -193,8 +273,8 @@ export default function OneTimeRewards() {
                 <span className="text-xs font-bold text-cyan-300">3</span>
               </div>
               <div>
-                <p className="text-sm font-medium text-cyan-300">Claim Rewards</p>
-                <p className="text-xs text-cyan-300/90">One-time bonus claimed to your wallet</p>
+                <p className="text-sm font-medium text-cyan-300">Automatic Eligibility</p>
+                <p className="text-xs text-cyan-300/90">Rewards become available when volume milestones are reached</p>
               </div>
             </div>
           </div>
@@ -212,35 +292,40 @@ export default function OneTimeRewards() {
             </div>
             <div className="p-3 cyber-glass border border-neon-green/20 rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-neon-green/80">Milestones 4-6</span>
+                <span className="text-sm text-neon-green">Milestones 4-6</span>
                 <span className="text-sm font-bold text-neon-green">$250 each</span>
               </div>
             </div>
             <div className="p-3 cyber-glass border border-neon-orange/20 rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-neon-orange/80">Milestones 7-9</span>
+                <span className="text-sm text-neon-orange">Milestones 7-9</span>
                 <span className="text-sm font-bold text-neon-orange">$500 each</span>
               </div>
             </div>
-            <div className="p-3 cyber-glass border border-neon-purple/20 rounded-lg">
+            <div className="p-3 cyber-glass border border-cyan-400/20 rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-neon-purple/80">Milestones 10-14</span>
-                <span className="text-sm font-bold text-neon-purple">$1,000 each</span>
+                <span className="text-sm text-cyan-400">Milestones 10-14</span>
+                <span className="text-sm font-bold text-cyan-400">$1,000 each</span>
               </div>
             </div>
+          </div>
+
+          <div className="mt-4 p-3 cyber-glass border border-neon-green/20 rounded-lg">
+            <p className="text-xs text-cyan-300/90 mb-1">Total Possible</p>
+            <p className="text-2xl font-bold text-neon-green">${totalPossibleRewards.toLocaleString()}</p>
           </div>
         </div>
       </div>
 
-      <div className="cyber-glass border border-cyan-500/30 rounded-xl p-4 relative overflow-hidden">
+      <div className="cyber-glass border border-cyan-500/20 rounded-xl p-4 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-neon-green/5 opacity-50" />
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
         <div className="flex items-start gap-3 relative z-10">
-          <Gift className="text-cyan-400 flex-shrink-0 mt-0.5" size={20} />
+          <AlertCircle className="text-cyan-400 flex-shrink-0 mt-0.5" size={20} />
           <div>
-            <p className="text-sm font-medium text-cyan-300 mb-1 uppercase tracking-wide">Achievement Rewards</p>
-            <p className="text-xs text-cyan-400/80">
-              One-time achievement rewards can be claimed to your Main Wallet (5% fee) or Safe Wallet (0% fee) when you reach volume milestones. These bonuses complement your recurring income streams and help you compound your earnings faster.
+            <p className="text-sm font-medium text-cyan-300 mb-1">Blockchain Integrated</p>
+            <p className="text-xs text-cyan-300/90">
+              This page displays real-time data from the Ocean DeFi smart contracts. Your qualified volume and reward eligibility are calculated directly from the blockchain. One-time achievement rewards are automatically unlocked when you reach each volume milestone.
             </p>
           </div>
         </div>
