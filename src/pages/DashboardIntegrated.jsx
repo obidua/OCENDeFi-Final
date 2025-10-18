@@ -1,6 +1,6 @@
 import { TrendingUp, Wallet, Users, Award, DollarSign, Clock, Zap, Gift, Trophy, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useUserOverview, usePortfolioSummaries, usePortfolioTotals, useWalletPanel, useLastTransactions } from '../hooks/useOceanData';
+import { useUserOverview, usePortfolioSummaries, usePortfolioTotals, useWalletPanel, useLast7DaysEarnings } from '../hooks/useOceanData';
 import oceanContractService from '../services/oceanContractService';
 import NumberPopup from '../components/NumberPopup';
 import LivePriceFeed from '../components/LivePriceFeed';
@@ -13,6 +13,7 @@ export default function Dashboard() {
   const { data: portfolios, loading: portfoliosLoading } = usePortfolioSummaries();
   const { data: totals, loading: totalsLoading } = usePortfolioTotals();
   const { data: walletPanel, loading: walletLoading } = useWalletPanel();
+  const { data: earningsData, loading: earningsLoading } = useLast7DaysEarnings();
 
   if (!isConnected || !address) {
     return (
@@ -72,14 +73,14 @@ export default function Dashboard() {
   const slabTierNames = ['Coral Reef', 'Shallow Waters', 'Tide Pool', 'Wave Crest', 'Open Sea', 'Deep Current', 'Ocean Floor', 'Abyssal Zone', 'Mariana Trench', 'Pacific Master', 'Ocean Sovereign'];
   const currentSlabName = parseInt(slabIndex) > 0 ? slabTierNames[parseInt(slabIndex) - 1] : 'None';
 
-  const quickEarningsData = [
-    { day: 'Mon', amount: 18 },
-    { day: 'Tue', amount: 22 },
-    { day: 'Wed', amount: 28 },
-    { day: 'Thu', amount: 25 },
-    { day: 'Fri', amount: 30 },
-    { day: 'Sat', amount: 32 },
-    { day: 'Sun', amount: 28 },
+  const quickEarningsData = earningsData && earningsData.length > 0 ? earningsData : [
+    { date: 'Mon', amount: 0 },
+    { date: 'Tue', amount: 0 },
+    { date: 'Wed', amount: 0 },
+    { date: 'Thu', amount: 0 },
+    { date: 'Fri', amount: 0 },
+    { date: 'Sat', amount: 0 },
+    { date: 'Sun', amount: 0 },
   ];
 
   return (
@@ -227,11 +228,14 @@ export default function Dashboard() {
 
           <div className="cyber-glass rounded-2xl p-4 sm:p-6 border border-cyan-500/30 hover:border-cyan-500/80 relative overflow-hidden transition-all">
             <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-            <h2 className="text-base sm:text-lg font-semibold text-cyan-300 mb-4 uppercase tracking-wide">7-Day Earnings Trend</h2>
+            <h2 className="text-base sm:text-lg font-semibold text-cyan-300 mb-4 uppercase tracking-wide">
+              7-Day Earnings Trend
+              {earningsLoading && <span className="text-xs ml-2 text-cyan-400/60 animate-pulse">(Loading...)</span>}
+            </h2>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={quickEarningsData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,240,255,0.1)" />
-                <XAxis dataKey="day" stroke="#22d3ee" fontSize={12} />
+                <XAxis dataKey="date" stroke="#22d3ee" fontSize={12} />
                 <YAxis stroke="#22d3ee" fontSize={12} />
                 <Tooltip
                   contentStyle={{
@@ -241,6 +245,8 @@ export default function Dashboard() {
                     color: '#22d3ee',
                     backdropFilter: 'blur(10px)',
                   }}
+                  formatter={(value) => `$${value.toFixed(2)}`}
+                  labelFormatter={(label) => `Day: ${label}`}
                 />
                 <Line
                   type="monotone"

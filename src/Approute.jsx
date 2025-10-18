@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, BrowserRouter } from 'react-router-dom';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/DashboardIntegrated';
 import PortfolioOverview from './pages/PortfolioOverview';
 import StakeInvest from './pages/StakeInvest';
 import ClaimEarnings from './pages/ClaimEarnings';

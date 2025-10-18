@@ -11,12 +11,9 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import {
-  getMockPortfolioDetails,
-  getMockUserStatus,
-  formatUSD,
-  formatRAMA,
-} from "../utils/contractData";
+import { useAccount } from 'wagmi';
+import { useUserOverview, usePortfolioSummaries, usePortfolioTotals } from '../hooks/useOceanData';
+import oceanContractService from '../services/oceanContractService';
 import { PortfolioStatus } from "../types/contract";
 import NumberPopup from "../components/NumberPopup";
 import Tooltip from "../components/Tooltip";
@@ -24,17 +21,43 @@ import CopyButton from "../components/CopyButton";
 import ProgressBar from "../components/ProgressBar";
 
 export default function PortfolioOverview() {
+  const { address, isConnected } = useAccount();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const portfolio = getMockPortfolioDetails();
-  const userStatus = getMockUserStatus();
 
-  const handleRefresh = () => {
+  const { data: overview, loading: overviewLoading, refetch: refetchOverview } = useUserOverview();
+  const { data: portfolios, loading: portfoliosLoading, refetch: refetchPortfolios } = usePortfolioSummaries();
+  const { data: totals, loading: totalsLoading, refetch: refetchTotals } = usePortfolioTotals();
+
+  const activePortfolio = portfolios?.find(p => p.active) || portfolios?.[0];
+  const totalStakedUSD = overview?.totalStakedUSD || '0';
+  const totalEarnedRama = totals?.totalEarnedRama || '0';
+  const directCount = overview?.directCount || '0';
+  const slabIndex = overview?.slabIndex || '0';
+  const qualifiedVolumeUSD = overview?.qualifiedVolumeUSD || '0';
+  const royaltyTier = overview?.royaltyTier || '0';
+  const totalSafeWalletRama = overview?.totalSafeWalletRama || '0';
+  const uplineSponsor = overview?.uplineSponsor || '0x0000000000000000000000000000000000000000';
+
+  const isBooster = activePortfolio?.booster || false;
+  const status = activePortfolio
+    ? oceanContractService.getPortfolioStatus(activePortfolio.active, activePortfolio.frozenUntil)
+    : 'INACTIVE';
+
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
+    try {
+      await Promise.all([
+        refetchOverview(),
+        refetchPortfolios(),
+        refetchTotals(),
+      ]);
       setLastUpdated(new Date());
-    }, 1500);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const getTimeAgo = (date) => {
@@ -46,21 +69,51 @@ export default function PortfolioOverview() {
     return `${hours}h ago`;
   };
 
-  const portfolioCapProgress =
-    (parseFloat(portfolio.totalEarnedUSD) / parseFloat(portfolio.maxCapUSD)) *
-    100;
-  const globalCapProgress =
-    (parseFloat(portfolio.totalLifetimeEarnedUSD) /
-      parseFloat(portfolio.maxLifetimeEarnableUSD)) *
-    100;
+  const maxCap = activePortfolio ? oceanContractService.calculateMaxCap(activePortfolio.principalUSD, isBooster) : 0;
+  const earnedSoFar = activePortfolio ? oceanContractService.toRAMA(activePortfolio.creditedRama) : 0;
+  const portfolioCapProgress = maxCap > 0 ? (earnedSoFar / maxCap) * 100 : 0;
 
-  const dailyRate = portfolio.isBooster
-    ? parseFloat(portfolio.stakedUSD) >= 5010e8
-      ? 0.8
-      : 0.66
-    : parseFloat(portfolio.stakedUSD) >= 5010e8
-    ? 0.4
-    : 0.33;
+  const totalLifetimeStaked = oceanContractService.toUSD(totalStakedUSD);
+  const totalLifetimeEarned = oceanContractService.toRAMA(totalEarnedRama);
+  const maxLifetimeEarnable = totalLifetimeStaked * 4;
+  const globalCapProgress = maxLifetimeEarnable > 0 ? (totalLifetimeEarned / maxLifetimeEarnable) * 100 : 0;
+
+  const dailyRate = oceanContractService.calculateDailyGrowthRate(totalStakedUSD, isBooster);
+
+  const accruedGrowthRAMA = activePortfolio
+    ? BigInt(activePortfolio.creditedRama) - BigInt(activePortfolio.principalRama || '0')
+    : 0n;
+
+  if (!isConnected || !address) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Wallet className="w-16 h-16 text-cyan-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-cyan-300 mb-2">Connect Your Wallet</h2>
+          <p className="text-cyan-300/70">Please connect your wallet to view your portfolio</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (overviewLoading || portfoliosLoading || totalsLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-cyan-500/20 rounded w-1/4 mb-2"></div>
+          <div className="h-4 bg-cyan-500/10 rounded w-1/3"></div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="cyber-glass rounded-xl p-5 border border-cyan-500/30 animate-pulse">
+              <div className="h-4 bg-cyan-500/20 rounded w-2/3 mb-3"></div>
+              <div className="h-8 bg-cyan-500/30 rounded w-1/2"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -97,7 +150,7 @@ export default function PortfolioOverview() {
             <div className="flex items-center gap-2 px-3 sm:px-4 py-2 cyber-glass border border-neon-green/30 rounded-lg flex-shrink-0 w-fit">
               <div className="w-2 h-2 bg-neon-green rounded-full animate-pulse" />
               <span className="text-xs sm:text-sm font-medium text-neon-green uppercase tracking-wide">
-                {portfolio.status}
+                {status}
               </span>
             </div>
           </div>
@@ -118,7 +171,7 @@ export default function PortfolioOverview() {
             <Info size={20} className="text-cyan-400/50" />
           </div>
           <NumberPopup
-            value={formatUSD(portfolio.stakedUSD)}
+            value={oceanContractService.formatUSD(totalStakedUSD)}
             label="Total Portfolio Value"
             className="text-xl sm:text-2xl font-bold text-cyan-300 mb-1"
           />
@@ -140,7 +193,7 @@ export default function PortfolioOverview() {
             </Tooltip>
           </div>
           <NumberPopup
-            value={formatUSD(portfolio.totalEarnedUSD)}
+            value={oceanContractService.formatRAMA(totalEarnedRama)}
             label="Total Earnings"
             className="text-xl sm:text-2xl font-bold text-neon-green mb-1"
           />
@@ -162,7 +215,7 @@ export default function PortfolioOverview() {
             </Tooltip>
           </div>
           <NumberPopup
-            value={formatUSD(portfolio.totalEarnedUSD)}
+            value={oceanContractService.formatRAMA(totalEarnedRama)}
             label="Total Earnings"
             className="text-xl sm:text-2xl font-bold text-neon-green mb-1"
           />
@@ -182,7 +235,7 @@ export default function PortfolioOverview() {
             </Tooltip>
           </div>
           <NumberPopup
-            value={formatUSD(portfolio.accruedGrowthUSD)}
+            value={oceanContractService.formatRAMA(accruedGrowthRAMA.toString())}
             label="Available to Claim"
             className="text-xl sm:text-2xl font-bold text-neon-orange mb-1"
           />
@@ -199,7 +252,7 @@ export default function PortfolioOverview() {
             <Info size={12} className="text-cyan-400/50" />
           </div>
           <p className="text-xl sm:text-2xl font-bold text-cyan-300 mb-1">
-            {userStatus.directChildrenCount}
+            {directCount.toString()}
           </p>
           <div className="flex items-center gap-1 text-xs">
             <span className="text-cyan-400/70">Direct referrals</span>
@@ -233,7 +286,7 @@ export default function PortfolioOverview() {
                 Staked Amount
               </p>
               <NumberPopup
-                value={formatUSD(portfolio.stakedUSD)}
+                value={oceanContractService.formatUSD(totalStakedUSD)}
                 label="Staked Amount"
                 className="text-lg sm:text-2xl font-bold text-cyan-300"
               />
@@ -243,7 +296,7 @@ export default function PortfolioOverview() {
                 Total Earned
               </p>
               <NumberPopup
-                value={formatUSD(portfolio.totalEarnedUSD)}
+                value={oceanContractService.formatRAMA(totalEarnedRama)}
                 label="Total Earned"
                 className="text-lg sm:text-2xl font-bold text-neon-green"
               />
@@ -262,15 +315,15 @@ export default function PortfolioOverview() {
               </div>
               <ProgressBar
                 progress={portfolioCapProgress}
-                current={formatUSD(portfolio.totalEarnedUSD)}
-                max={formatUSD(portfolio.maxCapUSD)}
+                current={`${earnedSoFar.toFixed(2)} RAMA`}
+                max={`${maxCap.toFixed(2)} RAMA`}
                 label=""
                 color="cyan"
                 showMilestones={true}
               />
               <p className="text-xs text-cyan-400/80 mt-2">
                 Cap Type:{" "}
-                {portfolio.isBooster ? "250% (Booster)" : "200% (Regular)"}
+                {isBooster ? "250% (Booster)" : "200% (Regular)"}
               </p>
             </div>
 
@@ -285,18 +338,15 @@ export default function PortfolioOverview() {
               </div>
               <ProgressBar
                 progress={globalCapProgress}
-                current={formatUSD(portfolio.totalLifetimeEarnedUSD)}
-                max={formatUSD(portfolio.maxLifetimeEarnableUSD)}
+                current={`${totalLifetimeEarned.toFixed(2)} RAMA`}
+                max={`${maxLifetimeEarnable.toFixed(2)} RAMA`}
                 label=""
                 color="green"
                 showMilestones={true}
               />
               <p className="text-xs text-cyan-400/80 mt-2">
                 Remaining:{" "}
-                {formatUSD(
-                  parseFloat(portfolio.maxLifetimeEarnableUSD) -
-                    parseFloat(portfolio.totalLifetimeEarnedUSD)
-                )}
+                {(maxLifetimeEarnable - totalLifetimeEarned).toFixed(2)} RAMA
               </p>
             </div>
           </div>
@@ -337,7 +387,7 @@ export default function PortfolioOverview() {
                 </Tooltip>
               </div>
               <p className="text-base sm:text-lg md:text-xl font-bold text-neon-green whitespace-nowrap">
-                {userStatus.directChildrenCount}
+                {directCount.toString()}
               </p>
             </div>
             <div className="p-2.5 sm:p-3 md:p-4 cyber-glass rounded-xl border border-neon-orange/30 hover:border-neon-orange/80 min-w-0  transition-all overflow-hidden">
@@ -356,7 +406,7 @@ export default function PortfolioOverview() {
                 </Tooltip>
               </div>
               <p className="text-base sm:text-lg md:text-xl font-bold text-neon-orange whitespace-nowrap">
-                {userStatus.currentSlabIndex}
+                {slabIndex.toString()}
               </p>
             </div>
           </div>
@@ -389,7 +439,7 @@ export default function PortfolioOverview() {
                 </Tooltip>
               </div>
               <NumberPopup
-                value={formatUSD(portfolio.accruedGrowthUSD)}
+                value={oceanContractService.formatRAMA(accruedGrowthRAMA.toString())}
                 label="Accrued Growth"
                 className="text-3xl sm:text-4xl font-bold mb-2 text-neon-glow"
               />
@@ -429,7 +479,7 @@ export default function PortfolioOverview() {
               </div>
             </div>
             <NumberPopup
-              value={`${formatRAMA(portfolio.safeWalletRAMA)} RAMA`}
+              value={`${oceanContractService.formatRAMA(totalSafeWalletRama)} RAMA`}
               label="Safe Wallet Balance"
               className="text-xl sm:text-2xl font-bold text-cyan-300 mb-1"
             />
@@ -464,7 +514,7 @@ export default function PortfolioOverview() {
             </div>
           </div>
           <NumberPopup
-            value={formatUSD(userStatus.qualifiedVolumeUSD)}
+            value={oceanContractService.formatUSD(qualifiedVolumeUSD)}
             label="Qualified Volume"
             className="text-lg sm:text-xl font-bold text-cyan-300"
           />
@@ -490,10 +540,10 @@ export default function PortfolioOverview() {
             </div>
           </div>
           <p className="text-lg sm:text-xl font-bold text-cyan-300">
-            Level {userStatus.currentRoyaltyLevelIndex}
+            Level {royaltyTier.toString()}
           </p>
           <p className="text-xs text-cyan-300/90 mt-1">
-            {userStatus.royaltyPayoutsReceived} payments received
+            {0} payments received
           </p>
         </div>
 
@@ -543,9 +593,9 @@ export default function PortfolioOverview() {
           </div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-mono text-cyan-300 truncate flex-1">
-              {portfolio.upline.slice(0, 6)}...{portfolio.upline.slice(-4)}
+              {uplineSponsor.slice(0, 6)}...{uplineSponsor.slice(-4)}
             </p>
-            <CopyButton text={portfolio.upline} label="" />
+            <CopyButton text={uplineSponsor} label="" />
           </div>
           <button className="text-xs text-cyan-400 hover:text-neon-green mt-2 transition-colors inline-flex items-center gap-1">
             <span>View Details</span>
@@ -554,7 +604,7 @@ export default function PortfolioOverview() {
         </div>
       </div>
 
-      {portfolio.status === PortfolioStatus.Frozen && (
+      {status === 'FROZEN' && activePortfolio && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
           <AlertCircle
             className="text-amber-600 flex-shrink-0 mt-0.5"
@@ -565,7 +615,7 @@ export default function PortfolioOverview() {
             <p className="text-sm text-amber-700 mt-1 break-words">
               Withdrawal freeze active until{" "}
               {new Date(
-                parseInt(portfolio.freezeEndsAt) * 1000
+                parseInt(activePortfolio.frozenUntil) * 1000
               ).toLocaleString()}
             </p>
           </div>
