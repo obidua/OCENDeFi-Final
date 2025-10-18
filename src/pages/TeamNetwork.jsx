@@ -1,72 +1,68 @@
-import { Users, TrendingUp, Copy, CheckCircle, Eye, Search, Filter, LayoutGrid, Table } from 'lucide-react';
+import { Users, TrendingUp, Copy, CheckCircle, Eye, Search, Filter, LayoutGrid, Table, Wallet } from 'lucide-react';
 import { useState } from 'react';
-import { getMockUserStatus, formatUSD } from '../utils/contractData';
+import { useAccount } from 'wagmi';
+import { useUserOverview, useTeamNetwork } from '../hooks/useOceanData';
+import oceanContractService from '../services/oceanContractService';
 import NumberPopup from '../components/NumberPopup';
 
-const mockDirects = [
-  { address: '0xABCD...1234', stakedUSD: 7500, teamVolume: 45000, activatedAt: '2024-09-15' },
-  { address: '0xEFGH...5678', stakedUSD: 5200, teamVolume: 28000, activatedAt: '2024-09-22' },
-  { address: '0xIJKL...9012', stakedUSD: 10000, teamVolume: 62000, activatedAt: '2024-10-01' },
-  { address: '0xMNOP...3456', stakedUSD: 3500, teamVolume: 12000, activatedAt: '2024-10-08' },
-  { address: '0xQRST...7890', stakedUSD: 2800, teamVolume: 8500, activatedAt: '2024-10-12' },
-];
-
-const mockLevelData = {
-  L1: [
-    { userId: 'USR-1001', address: '0xABCD...1234', stakedUSD: 7500, status: 'Active', joinDate: '2024-09-15', totalEarned: 2250 },
-    { userId: 'USR-1002', address: '0xEFGH...5678', stakedUSD: 5200, status: 'Active', joinDate: '2024-09-22', totalEarned: 1560 },
-    { userId: 'USR-1003', address: '0xIJKL...9012', stakedUSD: 10000, status: 'Active', joinDate: '2024-10-01', totalEarned: 3000 },
-    { userId: 'USR-1004', address: '0xMNOP...3456', stakedUSD: 3500, status: 'Active', joinDate: '2024-10-08', totalEarned: 1050 },
-    { userId: 'USR-1005', address: '0xQRST...7890', stakedUSD: 2800, status: 'Inactive', joinDate: '2024-10-12', totalEarned: 840 },
-  ],
-  L2: [
-    { userId: 'USR-2001', address: '0xUVWX...1111', stakedUSD: 6000, status: 'Active', joinDate: '2024-09-20', totalEarned: 1800 },
-    { userId: 'USR-2002', address: '0xYZAB...2222', stakedUSD: 4500, status: 'Active', joinDate: '2024-09-25', totalEarned: 1350 },
-    { userId: 'USR-2003', address: '0xCDEF...3333', stakedUSD: 8000, status: 'Inactive', joinDate: '2024-10-02', totalEarned: 2400 },
-  ],
-  L3: [
-    { userId: 'USR-3001', address: '0xGHIJ...4444', stakedUSD: 5500, status: 'Active', joinDate: '2024-09-28', totalEarned: 1650 },
-    { userId: 'USR-3002', address: '0xKLMN...5555', stakedUSD: 7200, status: 'Active', joinDate: '2024-10-05', totalEarned: 2160 },
-  ],
-  L4: [
-    { userId: 'USR-4001', address: '0xOPQR...6666', stakedUSD: 4800, status: 'Active', joinDate: '2024-10-10', totalEarned: 1440 },
-  ],
-  L5: [
-    { userId: 'USR-5001', address: '0xSTUV...7777', stakedUSD: 3200, status: 'Active', joinDate: '2024-10-15', totalEarned: 960 },
-  ],
-  L6: [],
-  L7: [],
-  L8: [],
-  L9: [],
-  L10: [],
-};
-
-
 export default function TeamNetwork() {
+  const { address, isConnected } = useAccount();
+  const { data: overview, loading: overviewLoading } = useUserOverview();
+  const { data: teamNetwork, loading: teamLoading } = useTeamNetwork();
+
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState('overview');
   const [activeLevel, setActiveLevel] = useState('L1');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const userStatus = getMockUserStatus();
-  const referralLink = 'https://oceandefi.io/ref/0x1234...5678';
+
+  if (!isConnected || !address) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Wallet className="w-16 h-16 text-cyan-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-cyan-300 mb-2">Connect Your Wallet</h2>
+          <p className="text-cyan-300/70">Please connect your wallet to view your team network</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (overviewLoading || teamLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-cyan-500/20 rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-cyan-500/10 rounded w-1/2"></div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="cyber-glass rounded-xl p-4 border border-cyan-500/30 animate-pulse">
+              <div className="h-4 bg-cyan-500/20 rounded w-2/3 mb-3"></div>
+              <div className="h-8 bg-cyan-500/30 rounded w-1/2"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const directCount = overview?.directCount || 0;
+  const teamCount = overview?.teamCount || 0;
+  const totalStakedUSD = overview?.totalStakedUSD || '0';
+  const qualifiedVolumeUSD = overview?.qualifiedVolumeUSD || '0';
+
+  const directMembers = teamNetwork?.directs || [];
+  const referralLink = `https://oceandefi.io/ref/${address}`;
 
   const levels = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9', 'L10'];
-  const currentLevelData = mockLevelData[activeLevel];
+
+  const currentLevelData = directMembers;
 
   const filteredData = currentLevelData.filter((member) => {
-    const matchesSearch =
-      member.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.address.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || member.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesSearch = member.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
   });
-
-  const totalDirectVolume = mockDirects.reduce((sum, d) => sum + d.stakedUSD, 0);
-  const totalTeamVolume = mockDirects.reduce((sum, d) => sum + d.teamVolume, 0);
-  const totalTeamMembers = Object.values(mockLevelData).reduce((sum, level) => sum + level.length, 0);
-  const activeMembers = Object.values(mockLevelData).flat().filter(m => m.status === 'Active').length;
-  const inactiveMembers = totalTeamMembers - activeMembers;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink);
@@ -139,20 +135,16 @@ export default function TeamNetwork() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="cyber-glass rounded-xl p-4 border border-cyan-500/30">
               <p className="text-xs text-cyan-300/90 mb-1 truncate">Direct Members</p>
-              <p className="text-2xl md:text-3xl font-bold text-cyan-300">{userStatus.directChildrenCount}</p>
+              <p className="text-2xl md:text-3xl font-bold text-cyan-300">{directCount.toString()}</p>
             </div>
             <div className="cyber-glass rounded-xl p-4 border border-cyan-500/30">
-              <p className="text-xs text-cyan-300/90 mb-1 truncate">Direct Volume</p>
-              <NumberPopup
-                value={formatUSD(totalDirectVolume * 1e8)}
-                label="Direct Volume"
-                className="text-lg md:text-xl font-bold text-cyan-400"
-              />
+              <p className="text-xs text-cyan-300/90 mb-1 truncate">Total Team</p>
+              <p className="text-2xl md:text-3xl font-bold text-neon-green">{teamCount.toString()}</p>
             </div>
             <div className="cyber-glass rounded-xl p-4 border border-cyan-500/30">
               <p className="text-xs text-cyan-300/90 mb-1 truncate">Team Volume</p>
               <NumberPopup
-                value={formatUSD(totalTeamVolume * 1e8)}
+                value={totalStakedUSD}
                 label="Team Volume"
                 className="text-lg md:text-xl font-bold text-neon-green"
               />
@@ -160,7 +152,7 @@ export default function TeamNetwork() {
             <div className="cyber-glass rounded-xl p-4 border border-cyan-500/30">
               <p className="text-xs text-cyan-300/90 mb-1 truncate">Qualified Volume</p>
               <NumberPopup
-                value={formatUSD(userStatus.qualifiedVolumeUSD)}
+                value={qualifiedVolumeUSD}
                 label="Qualified Volume"
                 className="text-lg md:text-xl font-bold text-neon-orange"
               />
@@ -172,43 +164,50 @@ export default function TeamNetwork() {
               <div className="cyber-glass rounded-2xl p-6 border border-cyan-500/30">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-cyan-300">Direct Referrals</h2>
-                  <span className="text-sm text-cyan-300/90">{mockDirects.length} members</span>
+                  <span className="text-sm text-cyan-300/90">{directMembers.length} members</span>
                 </div>
 
-                <div className="overflow-x-auto -mx-6 px-6">
-                  <div className="min-w-full space-y-3">
-                    {mockDirects.map((direct, idx) => (
-                      <div key={idx} className="p-4 cyber-glass border border-cyan-500/20 rounded-lg hover:cyber-glass border border-cyan-500/20 transition-colors min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                          <code className="text-sm font-mono text-cyan-300 truncate">{direct.address}</code>
-                          <span className="text-xs text-cyan-300/90 flex-shrink-0">{direct.activatedAt}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs text-cyan-300/90 mb-1">Stake Amount</p>
-                            <NumberPopup
-                              value={formatUSD(direct.stakedUSD * 1e8)}
-                              label="Stake Amount"
-                              className="text-sm font-semibold text-cyan-400"
-                            />
+                {directMembers.length > 0 ? (
+                  <div className="overflow-x-auto -mx-6 px-6">
+                    <div className="min-w-full space-y-3">
+                      {directMembers.map((member, idx) => (
+                        <div key={idx} className="p-4 cyber-glass border border-cyan-500/20 rounded-lg hover:border-cyan-500/40 transition-colors min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                            <code className="text-sm font-mono text-cyan-300 truncate">
+                              {member.slice(0, 6)}...{member.slice(-4)}
+                            </code>
+                            <span className="text-xs bg-neon-green/20 text-neon-green px-2 py-1 rounded-full">
+                              Active
+                            </span>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-xs text-cyan-300/90 mb-1">Team Volume</p>
-                            <NumberPopup
-                              value={formatUSD(direct.teamVolume * 1e8)}
-                              label="Team Volume"
-                              className="text-sm font-semibold text-neon-green"
-                            />
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs text-cyan-300/90 mb-1">Member #{idx + 1}</p>
+                              <p className="text-sm font-semibold text-cyan-400">Direct</p>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs text-cyan-300/90 mb-1">Level</p>
+                              <p className="text-sm font-semibold text-neon-green">L1</p>
+                            </div>
                           </div>
+                          <button
+                            onClick={() => window.open(`https://ramascan.com/address/${member}`, '_blank')}
+                            className="mt-3 text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                          >
+                            <Eye size={14} />
+                            View on Explorer
+                          </button>
                         </div>
-                        <button className="mt-3 text-xs text-cyan-400 hover:text-cyan-400 flex items-center gap-1">
-                          <Eye size={14} />
-                          View Details
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Users className="mx-auto text-cyan-400/30 mb-3" size={48} />
+                    <p className="text-cyan-300/90 font-medium">No direct referrals yet</p>
+                    <p className="text-sm text-cyan-300/70 mt-1">Share your referral link to start building your team</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -259,36 +258,36 @@ export default function TeamNetwork() {
                 <div className="space-y-3">
                   <div className="p-3 cyber-glass border border-cyan-500/20 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-cyan-300">Direct Commission</span>
-                      <span className="text-xs font-bold text-cyan-300">5%</span>
+                      <span className="text-xs text-cyan-300">Spot Income</span>
+                      <span className="text-xs font-bold text-cyan-300">10%</span>
                     </div>
-                    <p className="text-xs text-cyan-300">On external wallet stakes</p>
+                    <p className="text-xs text-cyan-300/90">Direct referral bonus</p>
                   </div>
 
                   <div className="p-3 cyber-glass border border-neon-green/20 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-neon-green/80">Slab Income</span>
+                      <span className="text-xs text-neon-green">Slab Income</span>
                       <span className="text-xs font-bold text-neon-green">Up to 60%</span>
                     </div>
-                    <p className="text-xs text-neon-green">From team growth</p>
+                    <p className="text-xs text-neon-green/90">Team difference income</p>
                   </div>
 
                   <div className="p-3 cyber-glass border border-neon-orange/20 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-neon-orange/80">Override Bonus</span>
+                      <span className="text-xs text-neon-orange">Override Bonus</span>
                       <span className="text-xs font-bold text-neon-orange">10%/5%/5%</span>
                     </div>
-                    <p className="text-xs text-neon-orange">Same-slab uplines</p>
+                    <p className="text-xs text-neon-orange/90">Same-slab uplines</p>
                   </div>
                 </div>
               </div>
 
-              <div className="cyber-glass border border-cyan-500/20 border border-cyan-500/30 rounded-xl p-4">
+              <div className="cyber-glass border border-cyan-500/20 rounded-xl p-4">
                 <div className="flex items-start gap-3">
                   <TrendingUp className="text-cyan-400 flex-shrink-0 mt-0.5" size={20} />
                   <div>
                     <p className="text-sm font-medium text-cyan-300 mb-1">Build Smart</p>
-                    <p className="text-xs text-cyan-300">
+                    <p className="text-xs text-cyan-300/90">
                       Focus on building multiple strong legs to maximize your qualified volume and unlock higher slab levels
                     </p>
                   </div>
@@ -302,20 +301,24 @@ export default function TeamNetwork() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="cyber-glass rounded-xl p-4 border border-cyan-500/30">
               <p className="text-xs text-cyan-300/90 mb-1 truncate">Total Members</p>
-              <p className="text-2xl md:text-3xl font-bold text-cyan-300">{totalTeamMembers}</p>
+              <p className="text-2xl md:text-3xl font-bold text-cyan-300">{teamCount.toString()}</p>
             </div>
             <div className="cyber-glass rounded-xl p-4 border border-cyan-500/30">
-              <p className="text-xs text-cyan-300/90 mb-1 truncate">Active Members</p>
-              <p className="text-2xl md:text-3xl font-bold text-neon-green">{activeMembers}</p>
+              <p className="text-xs text-cyan-300/90 mb-1 truncate">Direct Members</p>
+              <p className="text-2xl md:text-3xl font-bold text-neon-green">{directCount.toString()}</p>
             </div>
             <div className="cyber-glass rounded-xl p-4 border border-cyan-500/30">
-              <p className="text-xs text-cyan-300/90 mb-1 truncate">Inactive Members</p>
-              <p className="text-2xl md:text-3xl font-bold text-neon-orange">{inactiveMembers}</p>
+              <p className="text-xs text-cyan-300/90 mb-1 truncate">Team Volume</p>
+              <NumberPopup
+                value={totalStakedUSD}
+                label="Team Volume"
+                className="text-lg md:text-xl font-bold text-neon-orange"
+              />
             </div>
             <div className="cyber-glass rounded-xl p-4 border border-cyan-500/30">
               <p className="text-xs text-cyan-300/90 mb-1 truncate">Qualified Volume</p>
               <NumberPopup
-                value={formatUSD(userStatus.qualifiedVolumeUSD)}
+                value={qualifiedVolumeUSD}
                 label="Qualified Volume"
                 className="text-lg md:text-xl font-bold text-cyan-400"
               />
@@ -334,12 +337,12 @@ export default function TeamNetwork() {
                     className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                       activeLevel === level
                         ? 'bg-gradient-to-r from-cyan-500 to-neon-green text-white'
-                        : 'cyber-glass border border-cyan-500/20 text-cyan-400 hover:cyber-glass border border-cyan-500/30'
+                        : 'cyber-glass border border-cyan-500/20 text-cyan-400 hover:border-cyan-500/30'
                     }`}
                   >
                     {level}
                     <span className="ml-1.5 px-1.5 py-0.5 bg-white/20 rounded text-xs">
-                      {mockLevelData[level].length}
+                      {level === 'L1' ? directMembers.length : 0}
                     </span>
                   </button>
                 ))}
@@ -350,110 +353,91 @@ export default function TeamNetwork() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-300/80" size={18} />
                   <input
                     type="text"
-                    placeholder="Search by User ID or Address..."
+                    placeholder="Search by Address..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 cyber-glass border border-cyan-500/20 border border-cyan-500/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2.5 cyber-glass border border-cyan-500/20 rounded-lg text-sm text-cyan-300 placeholder-cyan-300/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                   />
-                </div>
-                <div className="relative">
-                  <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-300/80" size={18} />
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full sm:w-auto pl-10 pr-8 py-2.5 cyber-glass border border-cyan-500/20 border border-cyan-500/30 rounded-lg text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
-                  >
-                    <option value="All">All Status</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
                 </div>
               </div>
             </div>
 
             <div className="p-4 sm:p-6">
-              {filteredData.length === 0 ? (
+              {activeLevel === 'L1' ? (
+                filteredData.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Users className="mx-auto text-cyan-400/50 mb-3" size={48} />
+                    <p className="text-cyan-300/90 font-medium">
+                      {searchTerm ? 'No members found matching your search' : 'No team members at L1'}
+                    </p>
+                    <p className="text-sm text-cyan-300/70 mt-1">
+                      {searchTerm ? 'Try adjusting your search' : 'Share your referral link to grow your team'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto -mx-4 sm:-mx-6">
+                    <div className="inline-block min-w-full align-middle">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="border-b border-cyan-500/20">
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
+                              #
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
+                              Address
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
+                              Level
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-cyan-500/10">
+                          {filteredData.map((member, idx) => (
+                            <tr key={idx} className="hover:bg-cyan-500/5 transition-colors">
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <span className="text-sm font-medium text-cyan-300">{idx + 1}</span>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <code className="text-xs font-mono text-cyan-300">
+                                  {member.slice(0, 6)}...{member.slice(-4)}
+                                </code>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <span className="text-sm text-cyan-300">L1</span>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-neon-green/20 text-neon-green border border-neon-green/30">
+                                  Active
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <button
+                                  onClick={() => window.open(`https://ramascan.com/address/${member}`, '_blank')}
+                                  className="text-cyan-400 hover:text-cyan-300 transition-colors"
+                                >
+                                  <Eye size={18} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              ) : (
                 <div className="text-center py-12">
                   <Users className="mx-auto text-cyan-400/50 mb-3" size={48} />
-                  <p className="text-cyan-300/90 font-medium">No team members found at {activeLevel}</p>
-                  <p className="text-sm text-cyan-300/90 mt-1">
-                    {searchTerm || statusFilter !== 'All' ? 'Try adjusting your filters' : 'This level is empty'}
+                  <p className="text-cyan-300/90 font-medium">No team members at {activeLevel}</p>
+                  <p className="text-sm text-cyan-300/70 mt-1">
+                    Only direct referrals (L1) data is currently available
                   </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto -mx-4 sm:-mx-6">
-                  <div className="inline-block min-w-full align-middle">
-                    <table className="min-w-full">
-                      <thead>
-                        <tr className="border-b border-cyan-500/20">
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
-                            User ID
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
-                            Address
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
-                            Portfolio
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
-                            Total Earned
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
-                            Join Date
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-cyan-300 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-cyan-500/10">
-                        {filteredData.map((member, idx) => (
-                          <tr key={idx} className="hover:bg-cyan-500/5 transition-colors">
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className="text-sm font-medium text-cyan-300">{member.userId}</span>
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <code className="text-xs font-mono text-cyan-300">{member.address}</code>
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <NumberPopup
-                                value={formatUSD(member.stakedUSD * 1e8)}
-                                label="Portfolio"
-                                className="text-sm font-semibold text-cyan-300"
-                              />
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <NumberPopup
-                                value={formatUSD(member.totalEarned * 1e8)}
-                                label="Total Earned"
-                                className="text-sm font-semibold text-neon-green"
-                              />
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                                member.status === 'Active'
-                                  ? 'bg-neon-green/20 text-neon-green border border-neon-green/30'
-                                  : 'bg-neon-orange/20 text-neon-orange border border-neon-orange/30'
-                              }`}>
-                                {member.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className="text-sm text-cyan-300/90">{member.joinDate}</span>
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <button className="text-cyan-400 hover:text-cyan-400 transition-colors">
-                                <Eye size={18} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
                 </div>
               )}
             </div>
@@ -506,35 +490,35 @@ export default function TeamNetwork() {
               <div className="space-y-3">
                 <div className="p-3 cyber-glass border border-cyan-500/20 rounded-lg">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-cyan-300">Direct Commission</span>
-                    <span className="text-xs font-bold text-cyan-300">5%</span>
+                    <span className="text-xs text-cyan-300">Spot Income</span>
+                    <span className="text-xs font-bold text-cyan-300">10%</span>
                   </div>
-                  <p className="text-xs text-cyan-300">On external wallet stakes</p>
+                  <p className="text-xs text-cyan-300/90">Direct referral bonus</p>
                 </div>
 
                 <div className="p-3 cyber-glass border border-neon-green/20 rounded-lg">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-neon-green/80">Slab Income</span>
+                    <span className="text-xs text-neon-green">Slab Income</span>
                     <span className="text-xs font-bold text-neon-green">Up to 60%</span>
                   </div>
-                  <p className="text-xs text-neon-green">From team growth</p>
+                  <p className="text-xs text-neon-green/90">Team difference income</p>
                 </div>
 
                 <div className="p-3 cyber-glass border border-neon-orange/20 rounded-lg">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-neon-orange/80">Override Bonus</span>
+                    <span className="text-xs text-neon-orange">Override Bonus</span>
                     <span className="text-xs font-bold text-neon-orange">10%/5%/5%</span>
                   </div>
-                  <p className="text-xs text-neon-orange">Same-slab uplines</p>
+                  <p className="text-xs text-neon-orange/90">Same-slab uplines</p>
                 </div>
               </div>
 
-              <div className="mt-4 cyber-glass border border-cyan-500/20 border border-cyan-500/30 rounded-xl p-4">
+              <div className="mt-4 cyber-glass border border-cyan-500/20 rounded-xl p-4">
                 <div className="flex items-start gap-3">
                   <TrendingUp className="text-cyan-400 flex-shrink-0 mt-0.5" size={20} />
                   <div>
                     <p className="text-sm font-medium text-cyan-300 mb-1">Build Smart</p>
-                    <p className="text-xs text-cyan-300">
+                    <p className="text-xs text-cyan-300/90">
                       Focus on building multiple strong legs to maximize your qualified volume and unlock higher slab levels
                     </p>
                   </div>
