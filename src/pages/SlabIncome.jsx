@@ -1,22 +1,23 @@
-import { Award, TrendingUp, Users, AlertCircle, Layers, ArrowDown } from 'lucide-react';
-import { SLAB_LEVELS, formatUSD, formatPercentage, getMockUserStatus } from '../utils/contractData';
+import { Award, TrendingUp, Users, AlertCircle, Layers, ArrowDown, Wallet } from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { useSlabPanel, useUserOverview } from '../hooks/useOceanData';
+import oceanContractService from '../services/oceanContractService';
+import { SLAB_LEVELS } from '../utils/contractData';
 
-// Ocean-themed slab tier names
 const SLAB_TIER_NAMES = [
-  'Coral Reef',      // Level 1 - $500
-  'Shallow Waters',  // Level 2 - $2,500
-  'Tide Pool',       // Level 3 - $10,000
-  'Wave Crest',      // Level 4 - $25,000
-  'Open Sea',        // Level 5 - $50,000
-  'Deep Current',    // Level 6 - $100,000
-  'Ocean Floor',     // Level 7 - $500,000
-  'Abyssal Zone',    // Level 8 - $1M
-  'Mariana Trench',  // Level 9 - $2.5M
-  'Pacific Master',  // Level 10 - $5M
-  'Ocean Sovereign', // Level 11 - $20M
+  'Coral Reef',
+  'Shallow Waters',
+  'Tide Pool',
+  'Wave Crest',
+  'Open Sea',
+  'Deep Current',
+  'Ocean Floor',
+  'Abyssal Zone',
+  'Mariana Trench',
+  'Pacific Master',
+  'Ocean Sovereign',
 ];
 
-// Mock data for Same Slab Override earnings from downline
 const mockSameSlabEarnings = {
   L1: [
     { address: '0x1234...5678', slab: 3, earned: '45.50', percentage: '10%', status: 'Active' },
@@ -31,10 +32,46 @@ const mockSameSlabEarnings = {
 };
 
 export default function SlabIncome() {
-  const userStatus = getMockUserStatus();
-  const currentSlabIndex = parseInt(userStatus.currentSlabIndex);
+  const { address, isConnected } = useAccount();
+  const { data: slabPanel, loading: slabLoading } = useSlabPanel();
+  const { data: overview, loading: overviewLoading } = useUserOverview();
 
-  // Calculate total Same Slab Override earnings
+  if (!isConnected || !address) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Wallet className="w-16 h-16 text-cyan-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-cyan-300 mb-2">Connect Your Wallet</h2>
+          <p className="text-cyan-300/70">Please connect your wallet to view slab income details</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (slabLoading || overviewLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-cyan-500/20 rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-cyan-500/10 rounded w-1/2"></div>
+        </div>
+        <div className="grid lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="cyber-glass rounded-xl p-6 border border-cyan-500/30 animate-pulse">
+              <div className="h-4 bg-cyan-500/20 rounded w-2/3 mb-3"></div>
+              <div className="h-8 bg-cyan-500/30 rounded w-1/2"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const currentSlabIndex = slabPanel ? parseInt(slabPanel.slabIndex) : 0;
+  const qualifiedVolumeUSD = slabPanel?.qualifiedVolumeUSD || '0';
+  const directMembers = slabPanel?.directMembers || 0;
+  const canClaim = slabPanel?.canClaim || false;
+
   const totalL1Earnings = mockSameSlabEarnings.L1.reduce((sum, item) => sum + parseFloat(item.earned), 0);
   const totalL2Earnings = mockSameSlabEarnings.L2.reduce((sum, item) => sum + parseFloat(item.earned), 0);
   const totalL3Earnings = mockSameSlabEarnings.L3.reduce((sum, item) => sum + parseFloat(item.earned), 0);
@@ -65,7 +102,7 @@ export default function SlabIncome() {
           </div>
           <p className="text-5xl font-bold mb-2 text-neon-green relative z-10">{currentSlabIndex}</p>
           <p className="text-lg text-cyan-300 relative z-10">
-            {currentSlabIndex > 0 && formatPercentage(SLAB_LEVELS[currentSlabIndex - 1].percentageBPS)} Income Share
+            {currentSlabIndex > 0 && oceanContractService.formatPercentage(SLAB_LEVELS[currentSlabIndex - 1].percentageBPS)} Income Share
           </p>
         </div>
 
@@ -79,7 +116,7 @@ export default function SlabIncome() {
               <p className="text-xs text-cyan-300/90">40:30:30 calculated</p>
             </div>
           </div>
-          <p className="text-2xl font-bold text-cyan-300">{formatUSD(userStatus.qualifiedVolumeUSD)}</p>
+          <p className="text-2xl font-bold text-cyan-300">{oceanContractService.formatUSD(qualifiedVolumeUSD)}</p>
         </div>
 
         <div className="cyber-glass rounded-xl p-6 border border-cyan-500/30">
@@ -92,11 +129,10 @@ export default function SlabIncome() {
               <p className="text-xs text-cyan-300/90">Active referrals</p>
             </div>
           </div>
-          <p className="text-2xl font-bold text-cyan-300">{userStatus.directChildrenCount}</p>
+          <p className="text-2xl font-bold text-cyan-300">{directMembers.toString()}</p>
         </div>
       </div>
 
-      {/* Same Slab Override Earnings Section */}
       <div className="cyber-glass rounded-2xl p-6 border-2 border-neon-purple relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-neon-purple/50 to-transparent" />
         <div className="flex items-center justify-between mb-6">
@@ -113,7 +149,6 @@ export default function SlabIncome() {
           </div>
         </div>
 
-        {/* L1, L2, L3 Breakdown */}
         <div className="grid md:grid-cols-3 gap-4 mb-6">
           <div className="cyber-glass border-2 border-neon-purple rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
@@ -158,11 +193,9 @@ export default function SlabIncome() {
           </div>
         </div>
 
-        {/* Detailed Breakdown Table */}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-cyan-300 uppercase tracking-wide">Earnings Breakdown</h3>
 
-          {/* L1 Downline */}
           {mockSameSlabEarnings.L1.length > 0 && (
             <div className="cyber-glass border border-neon-purple/20 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
@@ -188,7 +221,6 @@ export default function SlabIncome() {
             </div>
           )}
 
-          {/* L2 Downline */}
           {mockSameSlabEarnings.L2.length > 0 && (
             <div className="cyber-glass border border-cyan-500/20 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
@@ -214,7 +246,6 @@ export default function SlabIncome() {
             </div>
           )}
 
-          {/* L3 Downline */}
           {mockSameSlabEarnings.L3.length > 0 && (
             <div className="cyber-glass border border-neon-green/20 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
@@ -241,7 +272,6 @@ export default function SlabIncome() {
           )}
         </div>
 
-        {/* How Same Slab Override Works */}
         <div className="mt-6 p-4 bg-neon-purple/5 border border-neon-purple/20 rounded-lg">
           <div className="flex items-start gap-3">
             <AlertCircle size={20} className="text-neon-purple flex-shrink-0 mt-0.5" />
@@ -337,13 +367,13 @@ export default function SlabIncome() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-cyan-300">
-                      {formatUSD(slab.requiredVolumeUSD)}
+                      {oceanContractService.formatUSD(slab.requiredVolumeUSD)}
                     </td>
                     <td className="py-3 px-4">
                       <span className={`font-bold text-lg ${
                         isCurrent ? 'text-neon-green' : isAchieved ? 'text-emerald-400' : 'text-cyan-300/50'
                       }`}>
-                        {formatPercentage(slab.percentageBPS)}
+                        {oceanContractService.formatPercentage(slab.percentageBPS)}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-cyan-300">
@@ -434,15 +464,15 @@ export default function SlabIncome() {
           <h3 className="font-semibold text-cyan-300 mb-4">Claim Requirements</h3>
           <div className="space-y-4">
             <div className="p-4 cyber-glass border border-cyan-500/20 rounded-lg">
-              <p className="text-sm font-medium text-cyan-300 mb-2">Rule 2: Direct Activation</p>
+              <p className="text-sm font-medium text-cyan-300 mb-2">Claim Status</p>
               <p className="text-xs text-cyan-300">
-                Requires 1 new $50 direct ID activation before claiming slab income
+                Check if you can claim accumulated slab income
               </p>
               <div className="mt-2">
-                {userStatus.nextSlabClaimRequiresDirects === '1' ? (
-                  <span className="text-xs font-medium text-neon-orange">⚠ Activation Required</span>
-                ) : (
+                {canClaim ? (
                   <span className="text-xs font-medium text-neon-green">✓ Ready to Claim</span>
+                ) : (
+                  <span className="text-xs font-medium text-neon-orange">⚠ Requirements Not Met</span>
                 )}
               </div>
             </div>
@@ -456,10 +486,15 @@ export default function SlabIncome() {
           </div>
 
           <button
-            onClick={() => alert('Claim Slab Income: Initiating claim transaction to transfer accumulated slab income to your chosen wallet.')}
-            className="w-full mt-4 py-3 bg-gradient-to-r from-cyan-500 to-neon-green text-white rounded-lg font-medium hover:shadow-lg transition-all"
+            onClick={() => alert('Claim Slab Income: Feature coming soon. Connect your wallet to the SlabManager contract to claim.')}
+            disabled={!canClaim}
+            className={`w-full mt-4 py-3 rounded-lg font-medium transition-all ${
+              canClaim
+                ? 'bg-gradient-to-r from-cyan-500 to-neon-green text-white hover:shadow-lg cursor-pointer'
+                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+            }`}
           >
-            Claim Slab Income
+            {canClaim ? 'Claim Slab Income' : 'Claim Not Available'}
           </button>
         </div>
       </div>
