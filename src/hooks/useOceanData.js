@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAccount } from 'wagmi';
 import oceanContractService from '../services/oceanContractService';
 import supabaseSyncService from '../services/supabaseSync';
+import { useActiveAddress } from './useActiveAddress';
 
 export function useUserOverview() {
-  const { address } = useAccount();
+  const { address } = useActiveAddress();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -76,7 +76,7 @@ export function useUserOverview() {
 }
 
 export function usePortfolioSummaries() {
-  const { address } = useAccount();
+  const { address } = useActiveAddress();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -108,7 +108,7 @@ export function usePortfolioSummaries() {
 }
 
 export function usePortfolioTotals() {
-  const { address } = useAccount();
+  const { address } = useActiveAddress();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -140,7 +140,7 @@ export function usePortfolioTotals() {
 }
 
 export function useSlabPanel() {
-  const { address } = useAccount();
+  const { address } = useActiveAddress();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -172,7 +172,7 @@ export function useSlabPanel() {
 }
 
 export function useRoyaltyPanel() {
-  const { address } = useAccount();
+  const { address } = useActiveAddress();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -204,7 +204,7 @@ export function useRoyaltyPanel() {
 }
 
 export function useWalletPanel() {
-  const { address } = useAccount();
+  const { address } = useActiveAddress();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -236,7 +236,7 @@ export function useWalletPanel() {
 }
 
 export function useTeamNetwork(maxDepth = 20) {
-  const { address } = useAccount();
+  const { address } = useActiveAddress();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -268,7 +268,7 @@ export function useTeamNetwork(maxDepth = 20) {
 }
 
 export function useLastTransactions(limit = 10) {
-  const { address } = useAccount();
+  const { address } = useActiveAddress();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -300,7 +300,7 @@ export function useLastTransactions(limit = 10) {
 }
 
 export function useLast7DaysEarnings() {
-  const { address } = useAccount();
+  const { address } = useActiveAddress();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

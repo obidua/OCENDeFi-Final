@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { projectId, metadata, networks, wagmiAdapter } from '../config'
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiProvider } from 'wagmi';
+import { ViewModeProvider } from './contexts/ViewModeContext';
 
 function App() {
 
@@ -29,7 +30,9 @@ function App() {
   return (
     <WagmiProvider config={wagmiAdapter.wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <Approute />
+        <ViewModeProvider>
+          <Approute />
+        </ViewModeProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

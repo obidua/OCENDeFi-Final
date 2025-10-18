@@ -7,9 +7,12 @@ import oceanContractService from '../services/oceanContractService';
 import oceanTransactionService from '../services/oceanTransactionService';
 import { useUserOverview, usePortfolioSummaries, useWalletPanel, useSlabPanel } from '../hooks/useOceanData';
 import Swal from 'sweetalert2';
+import { useViewMode } from '../contexts/ViewModeContext';
+import ViewModeBanner from '../components/ViewModeBanner';
 
 export default function ClaimEarnings() {
   const { address, isConnected } = useAccount();
+  const { viewMode } = useViewMode();
   const [selectedIncomeType, setSelectedIncomeType] = useState('');
   const [destination, setDestination] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
@@ -70,6 +73,18 @@ export default function ClaimEarnings() {
   const canClaim = selectedIncomeType && destination && details.rama >= (1 / ramaPrice) && !isClaiming;
 
   const handleClaim = async () => {
+    if (viewMode) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'View Mode Active',
+        text: 'You cannot claim while in view mode. Exit view mode to perform transactions.',
+        confirmButtonColor: '#06b6d4',
+        background: '#0a1929',
+        color: '#67e8f9',
+      });
+      return;
+    }
+
     if (!canClaim || !address) return;
 
     setIsClaiming(true);
@@ -209,6 +224,7 @@ export default function ClaimEarnings() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <ViewModeBanner />
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-neon-green relative inline-block">
           Claim Earnings

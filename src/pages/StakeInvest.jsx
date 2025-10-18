@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Wallet, Zap, TrendingUp, AlertCircle, CheckCircle, HelpCircle, ChevronDown, ChevronUp, DollarSign, User, Users, Info, Clipboard, Loader } from 'lucide-react';
+import { Wallet, Zap, TrendingUp, AlertCircle, CheckCircle, HelpCircle, ChevronDown, ChevronUp, DollarSign, User, Users, Info, Clipboard, Loader, Eye } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { formatUSD } from '../utils/contractData';
 import Tooltip from '../components/Tooltip';
 import oceanTransactionService from '../services/oceanTransactionService';
 import oceanContractService from '../services/oceanContractService';
 import Swal from 'sweetalert2';
+import { useViewMode } from '../contexts/ViewModeContext';
+import ViewModeBanner from '../components/ViewModeBanner';
 
 export default function StakeInvest() {
   const { address, isConnected } = useAccount();
+  const { viewMode } = useViewMode();
   const [stakeAmount, setStakeAmount] = useState('');
   const [stakeType, setStakeType] = useState('self');
   const [beneficiaryAddress, setBeneficiaryAddress] = useState('');
@@ -119,6 +122,18 @@ export default function StakeInvest() {
   };
 
   const handleStakeNow = async () => {
+    if (viewMode) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'View Mode Active',
+        text: 'You cannot stake while in view mode. Exit view mode to perform transactions.',
+        confirmButtonColor: '#06b6d4',
+        background: '#0a1929',
+        color: '#67e8f9',
+      });
+      return;
+    }
+
     if (!canStake || !address) return;
 
     setIsStaking(true);
@@ -216,6 +231,7 @@ export default function StakeInvest() {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-6">
+      <ViewModeBanner />
       <div>
         <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-neon-green relative inline-block">
           Stake & Invest
@@ -473,9 +489,9 @@ export default function StakeInvest() {
 
               <button
                 onClick={handleStakeNow}
-                disabled={!canStake || isStaking}
+                disabled={!canStake || isStaking || viewMode}
                 className={`w-full py-4 rounded-lg font-bold uppercase tracking-wide transition-all relative overflow-hidden group ${
-                  canStake && !isStaking
+                  canStake && !isStaking && !viewMode
                     ? 'bg-gradient-to-r from-cyan-500 to-neon-green text-dark-950 hover:shadow-neon-cyan hover:scale-[1.02] cursor-pointer'
                     : 'bg-dark-700/50 text-cyan-400/40 cursor-not-allowed'
                 }`}

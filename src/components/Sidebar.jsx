@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { generateOceanDefiPDF } from '../utils/generatePDF';
 import { useAccount, useDisconnect } from 'wagmi';
+import ViewModeToggle from './ViewModeToggle';
 
 const mainNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -94,13 +95,14 @@ export default function Sidebar() {
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-full cyber-glass border-r border-cyan-500/30 overflow-hidden">
-      <div className="p-6 border-b border-cyan-500/30">
+      <div className="p-6 border-b border-cyan-500/30 space-y-4">
         <Link to="/dashboard" className="flex items-center gap-2">
           <Waves className="text-cyan-400" size={28} />
           <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-neon-green">
             OCEAN DeFi
           </span>
         </Link>
+        <ViewModeToggle />
       </div>
 
       <div className="flex-1 overflow-y-auto hide-scrollbar p-4">
