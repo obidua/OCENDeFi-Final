@@ -1,7 +1,7 @@
 // src/components/MoreMenu.jsx
 import {
   X, Users, Award, Trophy, Gift, Vault, History,
-  TrendingUp, Info, Settings, FileDown, LogOut, Presentation, BookOpen
+  TrendingUp, Info, Settings, FileDown, LogOut, Presentation, BookOpen, Coins
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { generateOceanDefiPDF } from '../utils/generatePDF';
@@ -12,6 +12,7 @@ const menuSections = [
     title: 'Income & Rewards',
     items: [
       { path: '/dashboard/slab', label: 'Slab Income', icon: Award },
+      { path: '/dashboard/spot-income', label: 'Spot Income', icon: Coins },
       { path: '/dashboard/royalty', label: 'Royalty Program', icon: Trophy },
       { path: '/dashboard/rewards', label: 'One-Time Rewards', icon: Gift },
     ],

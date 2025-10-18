@@ -2,7 +2,7 @@
 import { Link, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Wallet, TrendingUp, Users, Award, Trophy, Gift, Vault,
-  History, Info, Settings, FileDown, LogOut, Presentation, BookOpen, Waves
+  History, Info, Settings, FileDown, LogOut, Presentation, BookOpen, Waves, Coins
 } from 'lucide-react';
 import { generateOceanDefiPDF } from '../utils/generatePDF';
 import { useAccount, useDisconnect } from 'wagmi';
@@ -19,6 +19,7 @@ const menuSections = [
     title: 'Income & Rewards',
     items: [
       { path: '/dashboard/slab', label: 'Slab Income', icon: Award },
+      { path: '/dashboard/spot-income', label: 'Spot Income', icon: Coins },
       { path: '/dashboard/royalty', label: 'Royalty Program', icon: Trophy },
       { path: '/dashboard/rewards', label: 'One-Time Rewards', icon: Gift },
     ],
