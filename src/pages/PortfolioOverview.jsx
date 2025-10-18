@@ -272,7 +272,7 @@ export default function PortfolioOverview() {
                 Your current investment details
               </p>
             </div>
-            {portfolio.isBooster && (
+            {isBooster && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-neon-orange to-neon-pink text-white rounded-lg text-xs sm:text-sm font-bold flex-shrink-0 w-fit  border border-neon-orange/50">
                 <Zap size={14} className="sm:w-4 sm:h-4 animate-pulse" />
                 <span className="uppercase">Booster</span>
@@ -444,11 +444,7 @@ export default function PortfolioOverview() {
                 className="text-3xl sm:text-4xl font-bold mb-2 text-neon-glow"
               />
               <p className="text-xs opacity-75 mb-4">
-                ≈{" "}
-                {formatRAMA(
-                  (parseFloat(portfolio.accruedGrowthUSD) / 1e8 / 0.0245) * 1e18
-                )}{" "}
-                RAMA
+                ≈ {(oceanContractService.toRAMA(accruedGrowthRAMA.toString()) * 0.0245).toFixed(2)} USD
               </p>
               <button className="w-full py-3 sm:py-3.5 bg-gradient-to-r from-neon-green to-cyan-500 hover:from-neon-green hover:to-neon-green text-dark-950 rounded-xl text-sm sm:text-base font-bold transition-all hover:shadow-neon-green hover:scale-[1.02] uppercase tracking-wide group relative overflow-hidden">
                 <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -483,13 +479,9 @@ export default function PortfolioOverview() {
               label="Safe Wallet Balance"
               className="text-xl sm:text-2xl font-bold text-cyan-300 mb-1"
             />
-            <NumberPopup
-              value={`≈ ${formatUSD(
-                (parseFloat(portfolio.safeWalletRAMA) / 1e18) * 0.0245 * 1e8
-              )}`}
-              label="Safe Wallet USD Value"
-              className="text-sm text-cyan-300/90"
-            />
+            <p className="text-sm text-cyan-300/90">
+              ≈ ${(oceanContractService.toRAMA(totalSafeWalletRama) * 0.0245).toFixed(2)} USD
+            </p>
           </div>
         </div>
       </div>
@@ -566,9 +558,7 @@ export default function PortfolioOverview() {
             </div>
           </div>
           <p className="text-base sm:text-lg font-bold text-cyan-300 truncate">
-            {userStatus.nextSlabClaimRequiresDirects === "1"
-              ? "Needs $50 ID"
-              : "Available"}
+            {overview?.slabCanClaim ? "Available" : "Cooldown"}
           </p>
           <p className="text-xs text-cyan-300/90 mt-1">24h cooldown period</p>
         </div>

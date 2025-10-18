@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Wallet, Zap, TrendingUp, AlertCircle, CheckCircle, HelpCircle, ChevronDown, ChevronUp, DollarSign, User, Users, Info, Clipboard } from 'lucide-react';
+import { Wallet, Zap, TrendingUp, AlertCircle, CheckCircle, HelpCircle, ChevronDown, ChevronUp, DollarSign, User, Users, Info, Clipboard, Loader } from 'lucide-react';
+import { useAccount } from 'wagmi';
 import { formatUSD } from '../utils/contractData';
 import Tooltip from '../components/Tooltip';
+import oceanTransactionService from '../services/oceanTransactionService';
+import oceanContractService from '../services/oceanContractService';
+import Swal from 'sweetalert2';
 
 export default function StakeInvest() {
+  const { address, isConnected } = useAccount();
   const [stakeAmount, setStakeAmount] = useState('');
   const [stakeType, setStakeType] = useState('self');
   const [beneficiaryAddress, setBeneficiaryAddress] = useState('');
@@ -12,9 +17,9 @@ export default function StakeInvest() {
   const [useWallet, setUseWallet] = useState('external');
   const [showInstructions, setShowInstructions] = useState(false);
   const [isStaking, setIsStaking] = useState(false);
-
-  const connectedWalletBalance = 12500.75;
-  const safeWalletBalance = 850.50;
+  const [connectedWalletBalance, setConnectedWalletBalance] = useState(0);
+  const [safeWalletBalance, setSafeWalletBalance] = useState(0);
+  const [loadingBalances, setLoadingBalances] = useState(true);
   const ramaPrice = 0.0245;
 
   const stakeValue = parseFloat(stakeAmount) || 0;
@@ -37,22 +42,58 @@ export default function StakeInvest() {
   const quickAmounts = [10, 50, 100, 500, 1000, 5000];
 
   useEffect(() => {
+    if (isConnected && address) {
+      loadWalletBalances();
+    }
+  }, [isConnected, address]);
+
+  const loadWalletBalances = async () => {
+    try {
+      setLoadingBalances(true);
+      const [connectedBalance, safeBalance] = await Promise.all([
+        oceanTransactionService.getConnectedWalletBalance(address),
+        oceanTransactionService.getSafeWalletBalance(address),
+      ]);
+      setConnectedWalletBalance(oceanContractService.toRAMA(connectedBalance));
+      setSafeWalletBalance(oceanContractService.toRAMA(safeBalance));
+    } catch (error) {
+      console.error('Error loading wallet balances:', error);
+    } finally {
+      setLoadingBalances(false);
+    }
+  };
+
+  useEffect(() => {
     if (stakeType === 'other' && beneficiaryAddress.trim().length > 10) {
       setIsValidatingAddress(true);
 
-      const timer = setTimeout(() => {
-        const isValidFormat = /^(0x[a-fA-F0-9]{40}|[A-Z0-9]{8,12})$/i.test(beneficiaryAddress.trim());
+      const timer = setTimeout(async () => {
+        const isValidFormat = /^0x[a-fA-F0-9]{40}$/i.test(beneficiaryAddress.trim());
 
         if (isValidFormat) {
-          setAddressValidation({
-            isValid: true,
-            message: 'Valid address',
-            userId: beneficiaryAddress.startsWith('0x') ? null : beneficiaryAddress
-          });
+          try {
+            const hasActivePortfolio = await oceanTransactionService.validateReferrerAddress(beneficiaryAddress);
+            if (hasActivePortfolio) {
+              setAddressValidation({
+                isValid: true,
+                message: 'Valid referrer with active portfolio',
+              });
+            } else {
+              setAddressValidation({
+                isValid: false,
+                message: 'Referrer must have an active portfolio of at least $50'
+              });
+            }
+          } catch (error) {
+            setAddressValidation({
+              isValid: false,
+              message: 'Unable to validate address'
+            });
+          }
         } else {
           setAddressValidation({
             isValid: false,
-            message: 'Invalid address or user ID format'
+            message: 'Invalid wallet address format'
           });
         }
         setIsValidatingAddress(false);
@@ -78,24 +119,100 @@ export default function StakeInvest() {
   };
 
   const handleStakeNow = async () => {
-    if (!canStake) return;
+    if (!canStake || !address) return;
 
     setIsStaking(true);
 
-    setTimeout(() => {
-      const recipient = stakeType === 'self' ? 'yourself' : `beneficiary ${beneficiaryAddress.substring(0, 10)}...`;
-      alert(`Success! Staked ${formatUSD(stakeValue * 1e8)} (${ramaAmount.toFixed(2)} RAMA) for ${recipient} using ${useWallet === 'external' ? 'Connected Wallet' : 'Safe Wallet'}.`);
+    try {
+      const referrer = stakeType === 'self' ? address : beneficiaryAddress;
+
+      const result = await Swal.fire({
+        title: 'Confirm Stake',
+        html: `
+          <div class="text-left space-y-2">
+            <p><strong>Amount:</strong> ${formatUSD(stakeValue * 1e8)} (${ramaAmount.toFixed(2)} RAMA)</p>
+            <p><strong>Tier:</strong> ${tier}</p>
+            <p><strong>Daily Rate:</strong> ${dailyRate}%</p>
+            <p><strong>Funding Source:</strong> ${useWallet === 'external' ? 'Connected Wallet' : 'Safe Wallet'}</p>
+            <p><strong>Referrer:</strong> ${referrer.substring(0, 6)}...${referrer.substring(referrer.length - 4)}</p>
+          </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Confirm & Stake',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#06b6d4',
+        background: '#0a1929',
+        color: '#67e8f9',
+      });
+
+      if (!result.isConfirmed) {
+        setIsStaking(false);
+        return;
+      }
+
+      const txResult = await oceanTransactionService.createPortfolio(
+        address,
+        referrer,
+        ramaAmount
+      );
+
+      if (txResult.success) {
+        await Swal.fire({
+          title: 'Stake Successful!',
+          html: `
+            <div class="text-left space-y-2">
+              <p>Portfolio ID: ${txResult.portfolioId}</p>
+              <p>Transaction Hash: ${txResult.txHash.substring(0, 10)}...</p>
+              <p>Amount Staked: ${ramaAmount.toFixed(2)} RAMA</p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonText: 'View Portfolio',
+          confirmButtonColor: '#06b6d4',
+          background: '#0a1929',
+          color: '#67e8f9',
+        });
+
+        setStakeAmount('');
+        setBeneficiaryAddress('');
+        setAddressValidation(null);
+        await loadWalletBalances();
+      }
+    } catch (error) {
+      console.error('Staking error:', error);
+      const errorMessage = oceanTransactionService.parseTransactionError(error);
+
+      await Swal.fire({
+        title: 'Stake Failed',
+        text: errorMessage,
+        icon: 'error',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#ef4444',
+        background: '#0a1929',
+        color: '#67e8f9',
+      });
+    } finally {
       setIsStaking(false);
-      setStakeAmount('');
-      setBeneficiaryAddress('');
-      setAddressValidation(null);
-    }, 2000);
+    }
   };
 
   const formatInputValue = (value) => {
     const num = parseFloat(value) || 0;
     return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   };
+
+  if (!isConnected || !address) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Wallet className="w-16 h-16 text-cyan-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-cyan-300 mb-2">Connect Your Wallet</h2>
+          <p className="text-cyan-300/70">Please connect your wallet to stake</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-20 lg:pb-6">
@@ -296,8 +413,17 @@ export default function StakeInvest() {
                       <p className="text-sm font-medium text-cyan-300">Connected Wallet</p>
                     </div>
                     <div className="text-left space-y-1">
-                      <p className="text-lg font-bold text-cyan-300">{connectedWalletBalance.toFixed(2)} RAMA</p>
-                      <p className="text-xs text-cyan-300/70">≈ ${(connectedWalletBalance * ramaPrice).toFixed(2)} USD</p>
+                      {loadingBalances ? (
+                        <div className="flex items-center gap-2">
+                          <Loader className="animate-spin text-cyan-400" size={16} />
+                          <p className="text-sm text-cyan-300">Loading...</p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-lg font-bold text-cyan-300">{connectedWalletBalance.toFixed(2)} RAMA</p>
+                          <p className="text-xs text-cyan-300/70">≈ ${(connectedWalletBalance * ramaPrice).toFixed(2)} USD</p>
+                        </>
+                      )}
                     </div>
                   </button>
 
@@ -314,8 +440,17 @@ export default function StakeInvest() {
                       <p className="text-sm font-medium text-neon-green">Safe Wallet</p>
                     </div>
                     <div className="text-left space-y-1">
-                      <p className="text-lg font-bold text-neon-green">{safeWalletBalance.toFixed(2)} RAMA</p>
-                      <p className="text-xs text-neon-green/70">≈ ${(safeWalletBalance * ramaPrice).toFixed(2)} USD</p>
+                      {loadingBalances ? (
+                        <div className="flex items-center gap-2">
+                          <Loader className="animate-spin text-neon-green" size={16} />
+                          <p className="text-sm text-neon-green">Loading...</p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-lg font-bold text-neon-green">{safeWalletBalance.toFixed(2)} RAMA</p>
+                          <p className="text-xs text-neon-green/70">≈ ${(safeWalletBalance * ramaPrice).toFixed(2)} USD</p>
+                        </>
+                      )}
                     </div>
                   </button>
                 </div>

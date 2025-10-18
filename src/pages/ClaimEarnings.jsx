@@ -1,80 +1,57 @@
-import { useState } from 'react';
-import { TrendingUp, Wallet, AlertCircle, Clock, CheckCircle, Award, Layers, Gift, ChevronDown } from 'lucide-react';
-import { getMockPortfolioDetails, getMockIncomeStreams, formatUSD } from '../utils/contractData';
+import { useState, useEffect } from 'react';
+import { TrendingUp, Wallet, AlertCircle, Clock, CheckCircle, Award, Layers, Gift, ChevronDown, Loader } from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { formatUSD } from '../utils/contractData';
 import NumberPopup from '../components/NumberPopup';
+import oceanContractService from '../services/oceanContractService';
+import oceanTransactionService from '../services/oceanTransactionService';
+import { useUserOverview, usePortfolioSummaries, useWalletPanel, useSlabPanel } from '../hooks/useOceanData';
+import Swal from 'sweetalert2';
 
 export default function ClaimEarnings() {
+  const { address, isConnected } = useAccount();
   const [selectedIncomeType, setSelectedIncomeType] = useState('');
   const [destination, setDestination] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
 
-  const portfolio = getMockPortfolioDetails();
-  const incomeStreams = getMockIncomeStreams();
+  const { data: overview, loading: overviewLoading, refetch: refetchOverview } = useUserOverview();
+  const { data: portfolios, loading: portfoliosLoading, refetch: refetchPortfolios } = usePortfolioSummaries();
+  const { data: walletPanel, loading: walletLoading, refetch: refetchWallet } = useWalletPanel();
+  const { data: slabPanel, loading: slabLoading, refetch: refetchSlab } = useSlabPanel();
 
-  const totalAvailableUSD =
-    parseFloat(incomeStreams.portfolioGrowth.availableUSD) +
-    parseFloat(incomeStreams.slabIncome.availableUSD) +
-    parseFloat(incomeStreams.royaltyIncome.availableUSD) +
-    parseFloat(incomeStreams.sameSlabOverride.availableUSD) +
-    parseFloat(incomeStreams.oneTimeReward.availableUSD);
+  const activePortfolio = portfolios?.find(p => p.active) || portfolios?.[0];
 
-  const accruedUSD = totalAvailableUSD / 1e8;
+  const accruedGrowthRAMA = activePortfolio
+    ? BigInt(activePortfolio.creditedRama) - BigInt(activePortfolio.principalRama || '0')
+    : 0n;
+
+  const safeWalletBalance = walletPanel?.safeRama || '0';
+  const slabAvailable = slabPanel?.canClaim || false;
+
   const ramaPrice = 0.0245;
-  const totalRamaAmount = accruedUSD / ramaPrice;
+  const totalAvailableRAMA = oceanContractService.toRAMA(accruedGrowthRAMA.toString());
+  const totalAvailableUSD = totalAvailableRAMA * ramaPrice;
 
   const incomeOptions = [
     {
       id: 'portfolioGrowth',
       name: 'Portfolio Growth',
       description: 'From staking rewards',
-      amount: incomeStreams.portfolioGrowth.availableUSD,
+      amountRAMA: accruedGrowthRAMA.toString(),
       icon: TrendingUp,
       color: 'neon-green',
-      status: incomeStreams.portfolioGrowth.status,
-      lastClaim: incomeStreams.portfolioGrowth.lastClaimDate,
+      status: totalAvailableRAMA > 0 ? 'available' : 'none',
+      portfolioId: activePortfolio?.pid,
     },
     {
       id: 'slabIncome',
       name: 'Slab Income',
       description: 'Team difference income',
-      amount: incomeStreams.slabIncome.availableUSD,
+      amountRAMA: '0',
       icon: Award,
       color: 'neon-purple',
-      status: incomeStreams.slabIncome.status,
-      lastClaim: incomeStreams.slabIncome.lastClaimDate,
-      cooldownEnds: incomeStreams.slabIncome.cooldownEndsAt,
-    },
-    {
-      id: 'royaltyIncome',
-      name: 'Royalty Income',
-      description: 'Monthly leadership rewards',
-      amount: incomeStreams.royaltyIncome.availableUSD,
-      icon: Award,
-      color: 'neon-orange',
-      status: incomeStreams.royaltyIncome.status,
-      lastClaim: incomeStreams.royaltyIncome.lastClaimDate,
-      nextEligible: incomeStreams.royaltyIncome.nextEligibleDate,
-    },
-    {
-      id: 'sameSlabOverride',
-      name: 'Same-Slab Override',
-      description: 'Override bonuses',
-      amount: incomeStreams.sameSlabOverride.availableUSD,
-      icon: Layers,
-      color: 'cyan-400',
-      status: incomeStreams.sameSlabOverride.status,
-      lastClaim: incomeStreams.sameSlabOverride.lastClaimDate,
-    },
-    {
-      id: 'oneTimeReward',
-      name: 'One-Time Reward',
-      description: 'Achievement bonus',
-      amount: incomeStreams.oneTimeReward.availableUSD,
-      icon: Gift,
-      color: 'blue-400',
-      status: incomeStreams.oneTimeReward.status,
-      lastClaim: incomeStreams.oneTimeReward.lastClaimDate,
-      rewardLevel: incomeStreams.oneTimeReward.rewardLevel,
+      status: slabAvailable ? 'available' : 'cooldown',
     },
   ];
 
@@ -82,28 +59,118 @@ export default function ClaimEarnings() {
 
   const calculateDetails = () => {
     if (!selectedIncome) return { usd: 0, rama: 0, fee: 0, net: 0 };
-    const usd = parseFloat(selectedIncome.amount) / 1e8;
-    const rama = usd / ramaPrice;
+    const rama = oceanContractService.toRAMA(selectedIncome.amountRAMA);
+    const usd = rama * ramaPrice;
     const fee = destination === 'external' ? rama * 0.05 : 0;
     const net = rama - fee;
     return { usd, rama, fee, net };
   };
 
   const details = calculateDetails();
-  const canClaim = selectedIncomeType && destination && details.usd >= 1;
+  const canClaim = selectedIncomeType && destination && details.rama >= (1 / ramaPrice) && !isClaiming;
 
-  const handleClaim = () => {
-    if (!canClaim) return;
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      setSelectedIncomeType('');
-      setDestination('');
-    }, 3000);
+  const handleClaim = async () => {
+    if (!canClaim || !address) return;
+
+    setIsClaiming(true);
+
+    try {
+      const result = await Swal.fire({
+        title: 'Confirm Claim',
+        html: `
+          <div class="text-left space-y-2">
+            <p><strong>Income Type:</strong> ${selectedIncome?.name}</p>
+            <p><strong>Amount:</strong> ${details.net.toFixed(2)} RAMA</p>
+            <p><strong>Destination:</strong> ${destination === 'safe' ? 'Safe Wallet' : 'External Wallet'}</p>
+            ${destination === 'external' ? `<p class="text-orange-400"><strong>Fee (5%):</strong> ${details.fee.toFixed(2)} RAMA</p>` : ''}
+          </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Confirm & Claim',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#06b6d4',
+        background: '#0a1929',
+        color: '#67e8f9',
+      });
+
+      if (!result.isConfirmed) {
+        setIsClaiming(false);
+        return;
+      }
+
+      let txResult;
+      const toSafe = destination === 'safe';
+
+      if (selectedIncomeType === 'portfolioGrowth') {
+        txResult = await oceanTransactionService.claimPortfolioGrowth(
+          address,
+          selectedIncome.portfolioId,
+          toSafe
+        );
+      } else if (selectedIncomeType === 'slabIncome') {
+        txResult = await oceanTransactionService.claimSlabIncome(address, toSafe);
+      } else if (selectedIncomeType === 'royaltyIncome') {
+        txResult = await oceanTransactionService.claimRoyaltyIncome(address);
+      }
+
+      if (txResult?.success) {
+        setShowSuccess(true);
+        await Swal.fire({
+          title: 'Claim Successful!',
+          html: `
+            <div class="text-left space-y-2">
+              <p>Transaction Hash: ${txResult.txHash.substring(0, 10)}...</p>
+              <p>Amount Claimed: ${details.net.toFixed(2)} RAMA</p>
+              <p>Destination: ${destination === 'safe' ? 'Safe Wallet' : 'External Wallet'}</p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#06b6d4',
+          background: '#0a1929',
+          color: '#67e8f9',
+        });
+
+        setTimeout(() => {
+          setShowSuccess(false);
+          setSelectedIncomeType('');
+          setDestination('');
+        }, 3000);
+
+        await Promise.all([
+          refetchOverview(),
+          refetchPortfolios(),
+          refetchWallet(),
+          refetchSlab(),
+        ]);
+      }
+    } catch (error) {
+      console.error('Claim error:', error);
+      const errorMessage = oceanTransactionService.parseTransactionError(error);
+
+      await Swal.fire({
+        title: 'Claim Failed',
+        text: errorMessage,
+        icon: 'error',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#ef4444',
+        background: '#0a1929',
+        color: '#67e8f9',
+      });
+    } finally {
+      setIsClaiming(false);
+    }
   };
 
-  const portfolioCapRemaining = (parseFloat(portfolio.maxCapUSD) - parseFloat(portfolio.totalEarnedUSD)) / 1e8;
-  const globalCapRemaining = (parseFloat(portfolio.maxLifetimeEarnableUSD) - parseFloat(portfolio.totalLifetimeEarnedUSD)) / 1e8;
+  const maxCap = activePortfolio ? oceanContractService.calculateMaxCap(activePortfolio.principalUSD, activePortfolio.booster) : 0;
+  const earnedSoFar = activePortfolio ? oceanContractService.toRAMA(activePortfolio.creditedRama) : 0;
+  const portfolioCapRemaining = maxCap - earnedSoFar;
+
+  const totalLifetimeStaked = oceanContractService.toUSD(overview?.totalStakedUSD || '0');
+  const totalLifetimeEarned = oceanContractService.toRAMA(walletPanel?.lifetimeRoiUsd || '0');
+  const maxLifetimeEarnable = totalLifetimeStaked * 4;
+  const globalCapRemaining = maxLifetimeEarnable - totalLifetimeEarned;
 
   const getColorClasses = (color) => {
     const colors = {
@@ -115,6 +182,30 @@ export default function ClaimEarnings() {
     };
     return colors[color] || colors['cyan-400'];
   };
+
+  if (!isConnected || !address) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Wallet className="w-16 h-16 text-cyan-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-cyan-300 mb-2">Connect Your Wallet</h2>
+          <p className="text-cyan-300/70">Please connect your wallet to claim earnings</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (overviewLoading || portfoliosLoading || walletLoading || slabLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader className="w-16 h-16 text-cyan-400 mx-auto mb-4 animate-spin" />
+          <h2 className="text-2xl font-bold text-cyan-300 mb-2">Loading Earnings Data</h2>
+          <p className="text-cyan-300/70">Fetching your claim information from blockchain...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -158,15 +249,13 @@ export default function ClaimEarnings() {
               </div>
             </div>
             <NumberPopup
-              value={`$${accruedUSD.toFixed(2)}`}
+              value={`${totalAvailableRAMA.toFixed(2)} RAMA`}
               label="Total Available"
               className="text-2xl sm:text-4xl lg:text-5xl font-bold mb-2 text-neon-green relative z-10"
             />
-            <NumberPopup
-              value={`≈ ${totalRamaAmount.toFixed(2)} RAMA`}
-              label="RAMA Equivalent"
-              className="text-sm sm:text-base lg:text-lg text-cyan-300 relative z-10"
-            />
+            <p className="text-sm sm:text-base lg:text-lg text-cyan-300 relative z-10">
+              ≈ ${totalAvailableUSD.toFixed(2)} USD
+            </p>
           </div>
 
           <div className="cyber-glass rounded-2xl p-4 sm:p-6 border border-cyan-500/30 hover:border-cyan-500/80 relative overflow-hidden transition-all">
@@ -216,11 +305,11 @@ export default function ClaimEarnings() {
                   >
                     <option value="">Choose income type...</option>
                     {incomeOptions.map((option) => {
-                      const amount = parseFloat(option.amount) / 1e8;
-                      const isDisabled = option.status === 'cooldown';
+                      const amount = oceanContractService.toRAMA(option.amountRAMA);
+                      const isDisabled = option.status === 'cooldown' || option.status === 'none';
                       return (
                         <option key={option.id} value={option.id} disabled={isDisabled}>
-                          {option.name} - ${amount.toFixed(2)} {isDisabled ? '(Cooldown)' : ''}
+                          {option.name} - {amount.toFixed(2)} RAMA {isDisabled ? `(${option.status})` : ''}
                         </option>
                       );
                     })}
@@ -354,20 +443,27 @@ export default function ClaimEarnings() {
 
                   <button
                     onClick={handleClaim}
-                    disabled={!canClaim}
+                    disabled={!canClaim || isClaiming}
                     className={`w-full py-3 sm:py-4 rounded-lg font-bold text-sm sm:text-base transition-all uppercase tracking-wide relative overflow-hidden group ${
-                      canClaim
+                      canClaim && !isClaiming
                         ? 'bg-gradient-to-r from-cyan-500 to-neon-green text-dark-950 hover:shadow-lg hover:shadow-neon-cyan/50 hover:scale-[1.02]'
                         : 'bg-dark-850 text-cyan-400/30 cursor-not-allowed border border-cyan-500/20'
                     }`}
                   >
-                    {canClaim && (
+                    {canClaim && !isClaiming && (
                       <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-neon-green opacity-0 group-hover:opacity-100 transition-opacity" />
                     )}
-                    <span className="relative z-10">
-                      {canClaim
-                        ? `Claim ${selectedIncome?.name} to ${destination === 'safe' ? 'Safe Wallet' : 'External Wallet'}`
-                        : 'Select Income & Destination'}
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      {isClaiming ? (
+                        <>
+                          <Loader className="animate-spin" size={20} />
+                          Processing...
+                        </>
+                      ) : canClaim ? (
+                        `Claim ${selectedIncome?.name} to ${destination === 'safe' ? 'Safe Wallet' : 'External Wallet'}`
+                      ) : (
+                        'Select Income & Destination'
+                      )}
                     </span>
                   </button>
                 </div>
@@ -419,17 +515,17 @@ export default function ClaimEarnings() {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-cyan-400 uppercase tracking-wider">Portfolio Cap</span>
                   <span className="text-xs font-bold text-cyan-300">
-                    {((parseFloat(portfolio.totalEarnedUSD) / parseFloat(portfolio.maxCapUSD)) * 100).toFixed(1)}%
+                    {maxCap > 0 ? ((earnedSoFar / maxCap) * 100).toFixed(1) : '0.0'}%
                   </span>
                 </div>
                 <div className="h-2 bg-dark-900 rounded-full overflow-hidden border border-cyan-500/30">
                   <div
                     className="h-full bg-gradient-to-r from-cyan-500 to-neon-green rounded-full transition-all"
-                    style={{ width: `${Math.min((parseFloat(portfolio.totalEarnedUSD) / parseFloat(portfolio.maxCapUSD)) * 100, 100)}%` }}
+                    style={{ width: `${Math.min(maxCap > 0 ? (earnedSoFar / maxCap) * 100 : 0, 100)}%` }}
                   />
                 </div>
                 <p className="text-xs text-cyan-300/90 mt-1">
-                  {formatUSD(portfolioCapRemaining * 1e8)} remaining
+                  {portfolioCapRemaining.toFixed(2)} RAMA remaining
                 </p>
               </div>
 
@@ -437,17 +533,17 @@ export default function ClaimEarnings() {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-cyan-400 uppercase tracking-wider">Global 4x Cap</span>
                   <span className="text-xs font-bold text-neon-green">
-                    {((parseFloat(portfolio.totalLifetimeEarnedUSD) / parseFloat(portfolio.maxLifetimeEarnableUSD)) * 100).toFixed(1)}%
+                    {maxLifetimeEarnable > 0 ? ((totalLifetimeEarned / maxLifetimeEarnable) * 100).toFixed(1) : '0.0'}%
                   </span>
                 </div>
                 <div className="h-2 bg-dark-900 rounded-full overflow-hidden border border-cyan-500/30">
                   <div
                     className="h-full bg-gradient-to-r from-neon-green to-cyan-500 rounded-full transition-all"
-                    style={{ width: `${Math.min((parseFloat(portfolio.totalLifetimeEarnedUSD) / parseFloat(portfolio.maxLifetimeEarnableUSD)) * 100, 100)}%` }}
+                    style={{ width: `${Math.min(maxLifetimeEarnable > 0 ? (totalLifetimeEarned / maxLifetimeEarnable) * 100 : 0, 100)}%` }}
                   />
                 </div>
                 <p className="text-xs text-cyan-300/90 mt-1">
-                  {formatUSD(globalCapRemaining * 1e8)} remaining
+                  ${globalCapRemaining.toFixed(2)} remaining
                 </p>
               </div>
             </div>
