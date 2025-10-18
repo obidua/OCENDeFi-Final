@@ -1,4 +1,4 @@
-import { Award, TrendingUp, Users, AlertCircle, Layers, Wallet, CheckCircle } from 'lucide-react';
+import { Award, TrendingUp, Users, AlertCircle, Layers, Wallet, CheckCircle, RefreshCw } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { useSlabPanel, useUserOverview } from '../hooks/useOceanData';
 import oceanContractService from '../services/oceanContractService';
@@ -35,11 +35,12 @@ const SLAB_TIER_NAMES = [
 
 export default function SlabIncome() {
   const { address, isConnected } = useAccount();
-  const { data: slabPanel, loading: slabLoading } = useSlabPanel();
-  const { data: overview, loading: overviewLoading } = useUserOverview();
+  const { data: slabPanel, loading: slabLoading, error: slabError, refetch: refetchSlab } = useSlabPanel();
+  const { data: overview, loading: overviewLoading, error: overviewError, refetch: refetchOverview } = useUserOverview();
   const incomeDistributor = useIncomeDistributorContract();
   const [differenceIncome, setDifferenceIncome] = useState('0');
   const [loadingIncome, setLoadingIncome] = useState(true);
+  const [incomeError, setIncomeError] = useState(null);
 
   useEffect(() => {
     async function fetchDifferenceIncome() {
@@ -49,10 +50,13 @@ export default function SlabIncome() {
       }
 
       try {
+        setIncomeError(null);
         const income = await incomeDistributor.methods.differenceIncome(address).call();
         setDifferenceIncome(income);
       } catch (error) {
         console.error('Error fetching difference income:', error);
+        setIncomeError(error.message);
+        setDifferenceIncome('0');
       } finally {
         setLoadingIncome(false);
       }
@@ -60,6 +64,11 @@ export default function SlabIncome() {
 
     fetchDifferenceIncome();
   }, [incomeDistributor, address]);
+
+  const handleRetry = () => {
+    refetchSlab();
+    refetchOverview();
+  };
 
   if (!isConnected || !address) {
     return (
@@ -87,6 +96,50 @@ export default function SlabIncome() {
               <div className="h-8 bg-cyan-500/30 rounded w-1/2"></div>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (slabError || overviewError || incomeError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-neon-green relative inline-block">
+            Slab Income System
+            <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-neon-green/20 blur-xl -z-10" />
+          </h1>
+          <p className="text-cyan-300/90 mt-1">Earn difference income from your team's growth</p>
+        </div>
+
+        <div className="cyber-glass border border-red-500/50 rounded-2xl p-8 text-center">
+          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-red-300 mb-2">Error Loading Data</h2>
+          <p className="text-cyan-300/70 mb-6 max-w-md mx-auto">
+            {slabError || overviewError || incomeError || 'Unable to fetch slab income data from blockchain'}
+          </p>
+          <button
+            onClick={handleRetry}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-neon-green text-dark-950 rounded-lg font-bold hover:shadow-lg transition-all"
+          >
+            <RefreshCw size={20} />
+            Retry
+          </button>
+        </div>
+
+        <div className="cyber-glass border border-cyan-500/20 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-cyan-400 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <p className="text-sm font-medium text-cyan-300 mb-1">Troubleshooting Tips</p>
+              <ul className="text-xs text-cyan-300/90 space-y-1 list-disc list-inside">
+                <li>Make sure your wallet is connected to the Ramestta network</li>
+                <li>Check your internet connection</li>
+                <li>Try refreshing the page</li>
+                <li>Contact support if the problem persists</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     );
