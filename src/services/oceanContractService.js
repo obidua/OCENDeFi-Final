@@ -152,33 +152,6 @@ export const oceanContractService = {
     }
   },
 
-  async getDailyEarningHistory(userAddress, daysCount = 30) {
-    try {
-      const today = Math.floor(Date.now() / (1000 * 60 * 60 * 24));
-      const history = [];
-
-      for (let i = 0; i < Math.ceil(daysCount / 7); i++) {
-        const dayId = today - (i * 7);
-        const earnings = await oceanViewContract.methods.getLast7DaysEarningsUSD(userAddress, dayId).call();
-
-        earnings.dayIds.forEach((day, idx) => {
-          if (earnings.usdAmounts[idx] !== '0') {
-            history.push({
-              dayId: day.toString(),
-              date: new Date(parseInt(day) * 86400 * 1000),
-              amountUSD: earnings.usdAmounts[idx],
-            });
-          }
-        });
-      }
-
-      return history.sort((a, b) => b.date - a.date).slice(0, daysCount);
-    } catch (error) {
-      console.error('Error fetching daily earning history:', error);
-      throw error;
-    }
-  },
-
   async getSumOfUserStakes(userAddress) {
     try {
       const amount = await oceanViewContract.methods.getSumOfUserStakes(userAddress).call();
