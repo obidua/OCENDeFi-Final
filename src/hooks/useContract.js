@@ -2,6 +2,15 @@ import { useMemo } from 'react';
 import { useAccount, useReadContract, useReadContracts } from 'wagmi';
 import Web3 from 'web3';
 import { CONTRACT_ADDRESSES } from '../config/contracts';
+import OceanViewABI from '../../store/Contract_ABI/OCEANVIEWUPGRADABLEABI.json';
+import OceanQueryABI from '../../store/Contract_ABI/OceanQueryUpgradeableABI.json';
+import PortfolioManagerABI from '../../store/Contract_ABI/PortFolioManager.json';
+import IncomeDistributorABI from '../../store/Contract_ABI/IncomeDistributor.json';
+import SafeWalletABI from '../../store/Contract_ABI/SafeWallet.json';
+import RoyaltyManagerABI from '../../store/Contract_ABI/RoyaltyManager.json';
+import SlabManagerABI from '../../store/Contract_ABI/SlabManager.json';
+import RewardVaultABI from '../../store/Contract_ABI/RewardVault.json';
+import UserRegistryABI from '../../store/Contract_ABI/UserRegistry.json';
 
 export function useWeb3() {
   return useMemo(() => {
@@ -16,7 +25,6 @@ export function useOceanViewContract() {
   return useMemo(() => {
     if (!web3) return null;
 
-    const OceanViewABI = require('../../store/Contract_ABI/OCEANVIEWUPGRADABLEABI.json');
     return new web3.eth.Contract(OceanViewABI, CONTRACT_ADDRESSES.OCEAN_VIEW);
   }, [web3]);
 }
@@ -27,7 +35,6 @@ export function useOceanQueryContract() {
   return useMemo(() => {
     if (!web3) return null;
 
-    const OceanQueryABI = require('../../store/Contract_ABI/OceanQueryUpgradeableABI.json');
     return new web3.eth.Contract(OceanQueryABI, CONTRACT_ADDRESSES.OCEAN_QUERY);
   }, [web3]);
 }
@@ -38,7 +45,6 @@ export function usePortfolioManagerContract() {
   return useMemo(() => {
     if (!web3) return null;
 
-    const PortfolioManagerABI = require('../../store/Contract_ABI/PortFolioManager.json');
     return new web3.eth.Contract(PortfolioManagerABI, CONTRACT_ADDRESSES.PORTFOLIO_MANAGER);
   }, [web3]);
 }
@@ -49,7 +55,6 @@ export function useIncomeDistributorContract() {
   return useMemo(() => {
     if (!web3) return null;
 
-    const IncomeDistributorABI = require('../../store/Contract_ABI/IncomeDistributor.json');
     return new web3.eth.Contract(IncomeDistributorABI, CONTRACT_ADDRESSES.INCOME_DISTRIBUTOR);
   }, [web3]);
 }
@@ -60,7 +65,6 @@ export function useSafeWalletContract() {
   return useMemo(() => {
     if (!web3) return null;
 
-    const SafeWalletABI = require('../../store/Contract_ABI/SafeWallet.json');
     return new web3.eth.Contract(SafeWalletABI, CONTRACT_ADDRESSES.SAFE_WALLET);
   }, [web3]);
 }
@@ -71,7 +75,6 @@ export function useRoyaltyManagerContract() {
   return useMemo(() => {
     if (!web3) return null;
 
-    const RoyaltyManagerABI = require('../../store/Contract_ABI/RoyaltyManager.json');
     return new web3.eth.Contract(RoyaltyManagerABI, CONTRACT_ADDRESSES.ROYALTY_MANAGER);
   }, [web3]);
 }
@@ -82,7 +85,6 @@ export function useSlabManagerContract() {
   return useMemo(() => {
     if (!web3) return null;
 
-    const SlabManagerABI = require('../../store/Contract_ABI/SlabManager.json');
     return new web3.eth.Contract(SlabManagerABI, CONTRACT_ADDRESSES.SLAB_MANAGER);
   }, [web3]);
 }
@@ -93,7 +95,6 @@ export function useRewardVaultContract() {
   return useMemo(() => {
     if (!web3) return null;
 
-    const RewardVaultABI = require('../../store/Contract_ABI/RewardVault.json');
     return new web3.eth.Contract(RewardVaultABI, CONTRACT_ADDRESSES.REWARD_VAULT);
   }, [web3]);
 }
@@ -104,7 +105,6 @@ export function useUserRegistryContract() {
   return useMemo(() => {
     if (!web3) return null;
 
-    const UserRegistryABI = require('../../store/Contract_ABI/UserRegistry.json');
     return new web3.eth.Contract(UserRegistryABI, CONTRACT_ADDRESSES.USER_REGISTRY);
   }, [web3]);
 }
