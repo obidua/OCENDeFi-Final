@@ -2,8 +2,6 @@ import { Award, TrendingUp, Users, AlertCircle, Layers, Wallet, CheckCircle, Ref
 import { useAccount } from 'wagmi';
 import { useSlabPanel, useUserOverview } from '../hooks/useOceanData';
 import oceanContractService from '../services/oceanContractService';
-import { useIncomeDistributorContract } from '../hooks/useContract';
-import { useEffect, useState } from 'react';
 
 const SLAB_LEVELS = [
   { minVolumeUSD: 1000e8, percentageBPS: 1000, directRequired: 1 },
@@ -37,38 +35,14 @@ export default function SlabIncome() {
   const { address, isConnected } = useAccount();
   const { data: slabPanel, loading: slabLoading, error: slabError, refetch: refetchSlab } = useSlabPanel();
   const { data: overview, loading: overviewLoading, error: overviewError, refetch: refetchOverview } = useUserOverview();
-  const incomeDistributor = useIncomeDistributorContract();
-  const [differenceIncome, setDifferenceIncome] = useState('0');
-  const [loadingIncome, setLoadingIncome] = useState(true);
-  const [incomeError, setIncomeError] = useState(null);
-
-  useEffect(() => {
-    async function fetchDifferenceIncome() {
-      if (!incomeDistributor || !address) {
-        setLoadingIncome(false);
-        return;
-      }
-
-      try {
-        setIncomeError(null);
-        const income = await incomeDistributor.methods.differenceIncome(address).call();
-        setDifferenceIncome(income);
-      } catch (error) {
-        console.error('Error fetching difference income:', error);
-        setIncomeError(error.message);
-        setDifferenceIncome('0');
-      } finally {
-        setLoadingIncome(false);
-      }
-    }
-
-    fetchDifferenceIncome();
-  }, [incomeDistributor, address]);
 
   const handleRetry = () => {
     refetchSlab();
     refetchOverview();
   };
+
+  const loading = slabLoading || overviewLoading;
+  const error = slabError || overviewError;
 
   if (!isConnected || !address) {
     return (
@@ -82,7 +56,7 @@ export default function SlabIncome() {
     );
   }
 
-  if (slabLoading || overviewLoading || loadingIncome) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
@@ -101,7 +75,7 @@ export default function SlabIncome() {
     );
   }
 
-  if (slabError || overviewError || incomeError) {
+  if (error) {
     return (
       <div className="space-y-6">
         <div>
@@ -116,7 +90,7 @@ export default function SlabIncome() {
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-red-300 mb-2">Error Loading Data</h2>
           <p className="text-cyan-300/70 mb-6 max-w-md mx-auto">
-            {slabError || overviewError || incomeError || 'Unable to fetch slab income data from blockchain'}
+            {error || 'Unable to fetch slab income data from blockchain'}
           </p>
           <button
             onClick={handleRetry}
@@ -150,7 +124,6 @@ export default function SlabIncome() {
   const directMembers = slabPanel?.directMembers || 0;
   const canClaim = slabPanel?.canClaim || false;
 
-  const differenceIncomeRAMA = differenceIncome || '0';
   const qualifiedVolume = oceanContractService.toUSD(qualifiedVolumeUSD);
 
   const nextSlabVolume = currentSlabIndex < SLAB_LEVELS.length
@@ -194,15 +167,19 @@ export default function SlabIncome() {
               <TrendingUp className="text-cyan-400" size={20} />
             </div>
             <div>
-              <p className="text-sm font-medium text-cyan-300">Total Slab Earnings</p>
-              <p className="text-xs text-cyan-300/90">Difference income</p>
+              <p className="text-sm font-medium text-cyan-300">Slab Income Status</p>
+              <p className="text-xs text-cyan-300/90">Claimable earnings</p>
             </div>
           </div>
-          <p className="text-3xl font-bold text-cyan-400">
-            {oceanContractService.formatRAMA(differenceIncomeRAMA)} RAMA
+          <p className="text-2xl font-bold text-cyan-400">
+            {canClaim ? (
+              <span className="text-neon-green">Ready to Claim</span>
+            ) : (
+              'Not Yet Available'
+            )}
           </p>
-          <p className="text-sm text-neon-green mt-1">
-            {oceanContractService.formatUSD(differenceIncomeRAMA)}
+          <p className="text-sm text-cyan-300/70 mt-1">
+            {canClaim ? 'Visit Claim Earnings to collect' : 'Meet slab requirements to earn'}
           </p>
         </div>
 
@@ -359,8 +336,10 @@ export default function SlabIncome() {
                   <span className="text-cyan-300 font-bold">{oceanContractService.formatUSD(qualifiedVolumeUSD)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-cyan-300/90">Difference Earned:</span>
-                  <span className="text-cyan-300 font-bold">{oceanContractService.formatRAMA(differenceIncomeRAMA)} RAMA</span>
+                  <span className="text-cyan-300/90">Claim Status:</span>
+                  <span className={`font-bold ${canClaim ? 'text-neon-green' : 'text-cyan-300/70'}`}>
+                    {canClaim ? 'Available' : 'Pending'}
+                  </span>
                 </div>
               </div>
             </div>

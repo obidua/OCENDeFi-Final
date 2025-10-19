@@ -24,17 +24,12 @@ export default function Analytics() {
       }
 
       try {
-        const [directIncome, differenceIncome] = await Promise.all([
-          incomeDistributor.methods.directIncome(address).call(),
-          incomeDistributor.methods.differenceIncome(address).call(),
-        ]);
-
-        const totalIncome = (BigInt(directIncome) + BigInt(differenceIncome)).toString();
+        const directIncome = await incomeDistributor.methods.directIncome(address).call();
 
         setIncomeBreakdown({
           direct: directIncome,
-          slab: differenceIncome,
-          total: totalIncome,
+          slab: '0',
+          total: directIncome,
         });
       } catch (error) {
         console.error('Error fetching income data:', error);
