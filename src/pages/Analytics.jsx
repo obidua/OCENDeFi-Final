@@ -9,36 +9,27 @@ export default function Analytics() {
   const { address, isConnected } = useAccount();
   const { data: overview, loading: overviewLoading } = useUserOverview();
   const incomeDistributor = useIncomeDistributorContract();
-  const [incomeBreakdown, setIncomeBreakdown] = useState({
-    direct: '0',
-    slab: '0',
-    total: '0',
-  });
+  const [directIncome, setDirectIncome] = useState('0');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchIncomeData() {
+    async function fetchDirectIncome() {
       if (!incomeDistributor || !address) {
         setLoading(false);
         return;
       }
 
       try {
-        const directIncome = await incomeDistributor.methods.directIncome(address).call();
-
-        setIncomeBreakdown({
-          direct: directIncome,
-          slab: '0',
-          total: directIncome,
-        });
+        const income = await incomeDistributor.methods.directIncome(address).call();
+        setDirectIncome(income);
       } catch (error) {
-        console.error('Error fetching income data:', error);
+        console.error('Error fetching direct income:', error);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchIncomeData();
+    fetchDirectIncome();
   }, [incomeDistributor, address]);
 
   if (!isConnected || !address) {
@@ -78,10 +69,11 @@ export default function Analytics() {
   const teamCount = overview?.teamCount || 0;
   const slabIndex = overview?.slabIndex || 0;
   const royaltyTier = overview?.royaltyTier || 0;
+  const totalRoiUsdPaid = overview?.totalRoiUsdPaid || '0';
 
-  const totalEarned = oceanContractService.toUSD(incomeBreakdown.total);
-  const directEarned = oceanContractService.toUSD(incomeBreakdown.direct);
-  const slabEarned = oceanContractService.toUSD(incomeBreakdown.slab);
+  const totalEarned = oceanContractService.toUSD(totalRoiUsdPaid);
+  const directEarned = oceanContractService.toUSD(directIncome);
+  const slabEarned = totalEarned - directEarned;
   const stakedValue = oceanContractService.toUSD(totalStakedUSD);
   const qualifiedVolume = oceanContractService.toUSD(qualifiedVolumeUSD);
 
